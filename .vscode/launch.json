@@ -29,6 +29,14 @@
 				"${workspaceFolder}/out/test/**/*.js"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"subProcess": true,
+			"program": "${file}",
+			"console": "integratedTerminal"
 		}
 	]
 }
