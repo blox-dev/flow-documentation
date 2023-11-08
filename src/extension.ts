@@ -11,7 +11,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
   const routePattern = /@app.route\((.+)\)/g; // Use a regular expression to find the word "count"
   const funcPattern = /def\s+(.+)\s*\(.*\)\s*:/g;
   const flowStartPattern = /#+\s*flow-start\((.+)\)/g;
-  const flowEndPattern = /#+\s*flow-start\((.+)\)/g;
+  const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
 
   var match;
   var matches: Record<string, Record<string, any>[]> = {};
@@ -37,16 +37,16 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
   }
 
   // match user defined functions
-  while ((match = funcPattern.exec(content))) {
-    if(matches["funcs"] === undefined) {
-      matches["funcs"] = [];
-    }
+  // while ((match = funcPattern.exec(content))) {
+  //   if(matches["funcs"] === undefined) {
+  //     matches["funcs"] = [];
+  //   }
 
-    const lineCountBeforeMatch = content
-      .slice(0, match.index)
-      .split("\n").length;
-    matches["funcs"].push({ name: match[1], lineno: lineCountBeforeMatch });
-  }
+  //   const lineCountBeforeMatch = content
+  //     .slice(0, match.index)
+  //     .split("\n").length;
+  //   matches["funcs"].push({ name: match[1], lineno: lineCountBeforeMatch });
+  // }
 
   // match flow-start(<flow-name>)
   while ((match = flowStartPattern.exec(content))) {
@@ -155,22 +155,26 @@ function countWordsInSubfolders(folderPath: string): Record<string, any> {
 }
 
 function runPythonProg(jsonArg: any) {
-  const pythonScriptPath = path.join(__dirname, "/../src/simplify_ast.py"); // Update with your script's path
+  const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
     const jsonArgString = JSON.stringify(jsonArg);
-
+    var output = [];
+    var error = [];
     // Run the Python script with the JSON argument
     const pythonProcess = child_process.spawn("python", [pythonScriptPath, jsonArgString]);
 
     pythonProcess.stdout.on("data", (data: any) => {
       console.log(`Python Script Output: ${data}`);
+      output.push(data);
     });
 
     pythonProcess.stderr.on("data", (data: any) => {
       console.error(`Python Script Error: ${data}`);
+      error.push(data);
     });
 
     pythonProcess.on("close", (code: any) => {
       console.log(`Python Script exited with code ${code}`);
+      // return output, error;
     });
 }
 
@@ -184,6 +188,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   var endPointMap = context.globalState.get("endPointMap") || [];
+  var graphs = context.globalState.get("graphs") || [];
   console.log(endPointMap);
 
   // The command has been defined in the package.json file

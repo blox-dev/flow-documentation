@@ -1,19 +1,21 @@
 import ast
-import importlib
+import importlib.util
 import sys
 from collections import defaultdict
-from simplify_ast import simplify_source_code
+from simplify_ast import SimplifyAST
 from pathlib import Path
+from ast2json import ast2json
+import json
 
 proj_path = ''
 
 def get_module_file(name):
     try:
         module = importlib.util.find_spec(name)
-        # module.origin can be = 'built-in', in which case we should ignore for unnecessary imports
+        # module.origin can be  = 'built-in', in which case we should ignore for unnecessary imports
         return module.origin if module.origin != 'built-in' else False
     except Exception as e:
-        print(e)
+        # print(e)
         return False
 
 def is_module_user_defined(name):
@@ -23,7 +25,7 @@ def is_module_user_defined(name):
             return True
         return False
     except Exception as e:
-        print(e)
+        # print(e)
         return False
 
 class ImportVisitor(ast.NodeVisitor):
@@ -34,11 +36,13 @@ class ImportVisitor(ast.NodeVisitor):
         self.modules_to_import = defaultdict(lambda: ("", set()), modules_to_import) # {"name": ("path", {"func1", "func2"})}
         self.imported_modules = set() # {"name", "name2"}
         self.asts = defaultdict(lambda: defaultdict(set))
+        self.references_per_module = defaultdict(lambda: defaultdict(set))
 
     def visit_Import(self, node):
         for alias in node.names:
             x = get_module_file(alias.name)
             if x:
+                self.references_per_module[self.current_module][alias.name] = set()
                 self.modules_to_import[alias.name] = (x, set())
         return node
 
@@ -46,10 +50,12 @@ class ImportVisitor(ast.NodeVisitor):
         if node.module is not None:
             x = get_module_file(node.module)
             if x:
+                self.references_per_module[self.current_module][node.module].update(set(map(lambda x: x.asname if x.asname else x.name, node.names)))
                 self.modules_to_import[node.module] = (x, set(map(lambda x: x.asname if x.asname else x.name, node.names)))
         return node
     
     def visit_FunctionDef(self, node):
+        self.references_per_module[self.current_module][self.current_module].add(node.name)
         if node.name not in self.target_funcs[self.current_module] or node.name in self.already_visited[self.current_module]:
             if not self.current_module in self.modules_to_import:
                 x = get_module_file(self.current_module)
@@ -87,7 +93,7 @@ class ImportVisitor(ast.NodeVisitor):
             tree = ast.parse(text)
             iv = ImportVisitor(mod_name, {mod_name: funcs}, self.modules_to_import, self.already_visited)
             iv.visit(tree)
-
+            self.references_per_module[mod_name].update(iv.references_per_module[mod_name])
             self.imported_modules.add(mod_name)
 
             for mod_name, d in iv.asts.items():
@@ -148,8 +154,8 @@ class FunctionVisitor(ast.NodeVisitor):
                     self.modules_to_import[k][1].add(func_name)
                     self.function_references[k].add(func_name)
                     break
-            else:
-                assert False
+            # else:
+                # assert False
         self.generic_visit(node)
 
     def _get_attribute_chain(self, node):
@@ -177,13 +183,16 @@ def lets_go(filepath, target_func):
     walker = ImportVisitor(current_filename, {current_filename: {target_func}}, dict(), dict())
     walker.visit(tree)
     asts = walker.asts
+    simplifier = SimplifyAST(walker.references_per_module)
+    output = []
     for mod_name, func_dict in asts.items():
         for func_name, func_ast in func_dict.items():
-            print(ast.dump(func_ast))
-            print()
-            print(ast.dump(simplify_source_code(func_ast)))
-            print('--------------------')
+            # print(ast.dump(simplifier.simplify_ast(func_ast, mod_name)))
+            simplified_ast = ast2json(simplifier.simplify_ast(func_ast, mod_name))
+            json_func = {"module": mod_name, "func_name": func_name, "ast": simplified_ast}
+            output.append(json_func)
+    print(output)
 
 # Example usage:
-if __name__ == "__main__":
-    lets_go("F:\Facultate\Master2\Thesis\code\gpt.py", "parse_code")
+# if __name__ == "__main__":
+lets_go("F:\Facultate\Master2\Thesis\code\gpt.py", "parse_code")

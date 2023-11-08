@@ -1,22 +1,61 @@
 import ast
+from _ast import AST
+import importlib.util
+import sys
 
-
-# List of function names
-function_names = ["func1", "func2", "func3"]
+def is_module_user_defined(name):
+    try:
+        module = importlib.util.find_spec(name)
+        if module.origin is not None and not module.origin.startswith(sys.prefix):
+            return True
+        return False
+    except Exception as e:
+        # print(e)
+        return False
 
 # Define a visitor class to simplify the AST
 class SimplifyAST(ast.NodeTransformer):
-    def __init__(self):
-        self.function_references = set(function_names)
+    def __init__(self, funcs = dict()):
+        self.function_references = funcs
         self.imports = set()
+        self.track_funcs = dict()
+        self.track_mod_name = ""
+
+    def simplify_ast(self, astt, mod_name):
+        if not isinstance(astt, AST):
+            astt = ast.parse(astt)
+        self.track_mod_name = mod_name
+        self.track_funcs = self.function_references[mod_name]
+        simplified_tree = self.visit(astt)
+        return simplified_tree
 
     def _ast_contains_func_call(self, node):
         if isinstance(node, list):
             return any([self._ast_contains_func_call(x) for x in node])
         for x in ast.walk(node):
-            if isinstance(x, ast.Call) and (x.func.id in self.function_references if 'id' in x.func._fields else x.func.attr in self.function_references):
-                return True
+            if isinstance(x, ast.Call):
+                if isinstance(x.func, ast.Name):
+                    # if is_module_user_defined
+                    # Handle simple function calls like "foo()"
+                    for k, v in self.track_funcs.items():
+                        if x.func.id in v and is_module_user_defined(k):
+                            return True
+                elif isinstance(x.func, ast.Attribute):
+                    # Handle method calls like "obj.method()"
+                    y = self._get_attribute_chain(x.func)
+                    for k in self.track_funcs.keys():
+                        if y.startswith(k) and is_module_user_defined(k):
+                            # func_name = y[len(k)+1:]
+                            # if func_name in self.track_funcs[k]:
+                            return True
         return False
+
+    def _get_attribute_chain(self, node):
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            return f"{self._get_attribute_chain(node.value)}.{node.attr}"
+        return None
 
     # def visit_Module(self, node):
     #     return self.generic_visit(node)
@@ -277,24 +316,3 @@ class SimplifyAST(ast.NodeTransformer):
 
     def visit_Alias(self, node):
         return self.generic_visit(node)
-
-def simplify_source_code(source_code):
-    tree = ast.parse(source_code)
-    simplifier = SimplifyAST()
-    simplified_tree = simplifier.visit(tree)
-    return simplified_tree
-
-# Example usage:
-if __name__ == "__main__":
-    source_code = """
-import find_funcs
-import re
-
-re.match("asd", "s")
-str(1234)
-"""
-    simplified_tree = simplify_source_code(source_code)
-    print()
-    print(ast.dump(simplified_tree))
-    print()
-    print(ast.dump(ast.parse(source_code)))
