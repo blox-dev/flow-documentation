@@ -4,11 +4,12 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
+import { assert } from "console";
 
 function extractWordCounts(filePath: string): Record<string, Record<string, any>[]> {
   const content = fs.readFileSync(filePath, "utf8");
 
-  const routePattern = /@app.route\((.+)\)/g; // Use a regular expression to find the word "count"
+  const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g; // Use a regular expression to find the word "count"
   const funcPattern = /def\s+(.+)\s*\(.*\)\s*:/g;
   const flowStartPattern = /#+\s*flow-start\((.+)\)/g;
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
@@ -154,28 +155,38 @@ function countWordsInSubfolders(folderPath: string): Record<string, any> {
   return subfolderCounts;
 }
 
-function runPythonProg(jsonArg: any) {
-  const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
-    const jsonArgString = JSON.stringify(jsonArg);
-    var output = [];
-    var error = [];
-    // Run the Python script with the JSON argument
-    const pythonProcess = child_process.spawn("python", [pythonScriptPath, jsonArgString]);
+interface LooseObject {
+  [key: string]: any
+}
 
+function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<string, string[]>> {
+  return new Promise((resolve, reject) => {
+    const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
+    const endP = JSON.stringify(endPoints);
+    var output: string[] = [];
+    var errors: string[] = [];
+    // Run the Python script with the JSON argument
+    const pythonProcess = child_process.spawn("python", [pythonScriptPath, flow.file, flow.func, endP]);
+    // const pythonProcess = child_process.spawn("python", [pythonScriptPath]);
+    
     pythonProcess.stdout.on("data", (data: any) => {
-      console.log(`Python Script Output: ${data}`);
+      console.log(data);
       output.push(data);
     });
 
-    pythonProcess.stderr.on("data", (data: any) => {
+    pythonProcess.stderr.on("error", (data: any) => {
       console.error(`Python Script Error: ${data}`);
-      error.push(data);
+      errors.push(data);
     });
 
     pythonProcess.on("close", (code: any) => {
-      console.log(`Python Script exited with code ${code}`);
-      // return output, error;
+      if (code === 0) {
+        resolve({ outputs: output, errors: errors });
+      } else {
+        reject(`Python script exited with code ${code}`);
+      }
     });
+  });
 }
 
 // This method is called when your extension is activated
@@ -203,11 +214,55 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  function showGraph(data: JSON) {
+    const panel = vscode.window.createWebviewPanel(
+      'graph',
+      'Workspace Graph',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true
+      }
+    );
+
+    // Load an HTML file or generate HTML content with the graph here
+    panel.webview.html = getWebviewContent(panel, data, context);
+
+    // In your WebView
+    // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
+
+    // In your extension
+    panel.webview.onDidReceiveMessage((message) => {
+      if (message.command === 'openFile' && message.filePath) {
+          vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath)).then((document) => {
+              vscode.window.showTextDocument(document);
+          });
+      }
+    });
+  };
+
   const disposable2 = vscode.commands.registerCommand(
     "flow-documentation.countWords",
     () => {
       const endPoints = countWordsInFolders(context);
-      runPythonProg(endPoints);
+      const [endP, flows] = extractFlowsAndEnpoints(endPoints);
+      for(let i = 0 ; i< flows.length ; ++i) {
+        runPythonProg(flows[i], endP).then((result) => {
+          if (result.errors.length) {
+            result.errors.forEach(err => console.error(err));
+            throw new Error();
+          }
+          if (result.outputs.length > 1) {
+            throw new Error("too much python output");
+          }
+          const data = JSON.parse(result.outputs[0]);
+          showGraph(data);
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+      }
+
       context.globalState.update("endPointMap", endPoints);
       vscode.window.showInformationMessage(JSON.stringify(endPoints));
     }
@@ -219,3 +274,130 @@ export function activate(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
+
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function replaceAll(str: string, find: string, replace: string) {
+  return str.replace(new RegExp(escapeRegExp(find), 'g'), replace);
+}
+
+function vscodePath(pp: string) {
+  return replaceAll(path.normalize(pp), '\\', '/');
+}
+
+// Inside the getWebviewContent function
+function getWebviewContent(panel: vscode.WebviewPanel, data: JSON, context: vscode.ExtensionContext ) {
+  const workspacePath = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : ''; // Assumes you have a workspace open
+
+  if (!workspacePath) {
+      return '<p>No workspace open.</p>';
+  }
+
+  
+  const filesInWorkspace = [
+      // { name: 'File 1', path: 'F:/Facultate/Master2/Thesis/code/extensions/flow-documentation/src/ast2json.py' },
+      { name: 'File 1', path:  vscodePath(path.join(context.extensionPath, 'src/ast2json.py')) },
+      { name: 'File 2', path: 'path/to/your/file2' },
+      // Add more files as needed
+  ];
+
+  const tableRows = filesInWorkspace.map((file) => {
+      return `<tr><td><a href="#" onclick="openFile('${file.path}')">${file.name}</a></td></tr>`;
+  });
+
+  const mermaidPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'mermaid.min.js'));
+  const mermaidSrc = panel.webview.asWebviewUri(mermaidPath);
+
+
+  return `<!DOCTYPE html>
+<html>
+    <head>
+      <script src="${mermaidSrc}"></script>
+    </head>
+  <body>
+    <table>
+      ${tableRows}
+    </table>
+    ${data}
+    <div id="here">hello</div>
+    <script>
+      const vscode = acquireVsCodeApi();
+      function openFile(filePath) {
+        console.log(document);
+        vscode.postMessage({ command: 'openFile', filePath });
+      }
+    </script>
+    <script>
+    async function ads () {
+      mermaid.initialize({ startOnLoad: false });
+      const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "graph TD\\n Start --> Stop ");
+      console.log(htmlCode);
+      document.getElementById('here').innerHTML = htmlCode.svg;
+  
+      const nodes = document.querySelectorAll('.node');
+        nodes.forEach(node => {
+            const textContent = node.querySelector('text').textContent;
+            if (parseInt(textContent, 10) % 2 === 0) {
+                node.classList.add('even');
+            }
+        });
+    }
+      ads();
+    </script>
+  </body>
+</html>`;
+}
+
+function customFlattenObject(obj: Record<string, any>, parentKey: string = ''): Record<string, Object[]> {
+  let flattened: Record<string, Object[]> = {};
+
+  for (let key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      let newKey = parentKey ? `${parentKey}.${key}` : key;
+
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
+        if (['routes', 'flowStart', 'flowEnd', 'flowIgnore'].includes(key)) {
+          flattened[newKey] = obj[key];
+        } else {
+          Object.assign(flattened, customFlattenObject(obj[key], key));
+        }
+      } else {
+        flattened[newKey] = obj[key];
+      }
+    }
+  }
+
+  return flattened;
+}
+
+function extractFlowsAndEnpoints(endPoints: Record<string, any>): [any, any] {
+  let routes: Object[] = [];
+  let flows: Object[] = [];
+  let flat: Record<string, Object[]> = customFlattenObject(endPoints);
+  for (const key of Object.keys(flat)) {
+    const sp = key.split('.');
+    if (sp[sp.length - 1] === 'routes') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        routes.push(newObject);
+      }
+    }
+    else if (sp[sp.length - 1] === 'flowStart') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        flows.push(newObject);
+      }
+    }
+    else if (sp[sp.length - 1] === 'flowEnd') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        flows.push(newObject);
+      }
+    }
+  }
+
+  return [routes, flows];
+}
+

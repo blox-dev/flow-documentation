@@ -3,6 +3,7 @@ import importlib.util
 import sys
 from collections import defaultdict
 from simplify_ast import SimplifyAST
+from create_graph import create_graph
 from pathlib import Path
 from ast2json import ast2json
 import json
@@ -167,7 +168,7 @@ class FunctionVisitor(ast.NodeVisitor):
 
 
 
-def lets_go(filepath, target_func):
+def lets_go(filepath, target_func, routes=[]):
     path = Path(filepath)
     current_filename = path.stem
     
@@ -183,16 +184,31 @@ def lets_go(filepath, target_func):
     walker = ImportVisitor(current_filename, {current_filename: {target_func}}, dict(), dict())
     walker.visit(tree)
     asts = walker.asts
+    modules = walker.modules_to_import
     simplifier = SimplifyAST(walker.references_per_module)
-    output = []
+    output = {"asts": []}
     for mod_name, func_dict in asts.items():
         for func_name, func_ast in func_dict.items():
             # print(ast.dump(simplifier.simplify_ast(func_ast, mod_name)))
             simplified_ast = ast2json(simplifier.simplify_ast(func_ast, mod_name))
-            json_func = {"module": mod_name, "func_name": func_name, "ast": simplified_ast}
-            output.append(json_func)
-    print(output)
+            json_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": simplified_ast}
+            output["asts"].append(json_func)
+    create_graph(current_filename, target_func, output["asts"])
+    print(json.dumps(output), file=sys.stdout, flush=True)
 
 # Example usage:
 # if __name__ == "__main__":
-lets_go("F:\Facultate\Master2\Thesis\code\gpt.py", "parse_code")
+try:
+    argc = len(sys.argv)
+    # print(sys.argv, argc)
+    if argc < 3:
+        lets_go("F:\Facultate\Master2\Thesis\code\gpt.py", "parse_code")
+    else:
+        filepath = sys.argv[1]
+        func_name = sys.argv[2]
+        routes = []
+        # if argc == 4:
+        #     routes = json.loads(sys.arg[3])
+        lets_go(filepath, func_name, routes=routes)
+except Exception as e:
+    print(e, file=sys.stderr, flush=True)
