@@ -25,7 +25,9 @@ class SimplifyAST(ast.NodeTransformer):
         if not isinstance(astt, AST):
             astt = ast.parse(astt)
         self.track_mod_name = mod_name
-        self.track_funcs = self.function_references[mod_name]
+        # TODO: something is wrong with the function references here
+        self.track_funcs = self.function_references["gpt"]
+        # self.track_funcs = self.function_references[mod_name]
         simplified_tree = self.visit(astt)
         return simplified_tree
 
@@ -65,7 +67,7 @@ class SimplifyAST(ast.NodeTransformer):
     
     def visit_Expr(self, node):
         if self._ast_contains_func_call(node):
-            return node
+            return self.generic_visit(node)
         return None
     
     def visit_NamedExpr(self, node):
@@ -86,11 +88,11 @@ class SimplifyAST(ast.NodeTransformer):
                     self.function_references.add(alias.asname)
         return None
     
-    def visit_Assign(self, node):
-        # TODO: check node.value to include node.targets in the functions we are looking for (only for this file)
-        if self._ast_contains_func_call(node):
-            return node
-        return None
+    # def visit_Assign(self, node):
+    #     # TODO: check node.value to include node.targets in the functions we are looking for (only for this file)
+    #     if self._ast_contains_func_call(node):
+    #         return self.generic_visit(node)
+    #     return None
     
     def visit_AugAssign(self, node):
         return self.generic_visit(node)
@@ -144,8 +146,6 @@ class SimplifyAST(ast.NodeTransformer):
         return self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
-        # Should be finished before the script, when getting all the function names from all files
-        # self.function_references.add(node.name)
         return self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node):
@@ -249,9 +249,31 @@ class SimplifyAST(ast.NodeTransformer):
     def visit_Attribute(self, node):
         return self.generic_visit(node)
 
+    def _get_attribute_chain(self, node):
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            return f"{self._get_attribute_chain(node.value)}.{node.attr}"
+        return None
+
     def visit_Call(self, node):
-        if isinstance(node.func, ast.Name) and (node.func.id in self.function_references if 'id' in node.func._fields else node.func.attr in self.function_references):
-            return self.generic_visit(node)
+        if isinstance(node.func, ast.Name):
+            # Handle simple function calls like "foo()"
+            for v in self.track_funcs.values():
+                if node.func.id in v:
+                    return node
+            return None
+        elif isinstance(node.func, ast.Attribute):
+            # Handle method calls like "obj.method()"
+            y = self._get_attribute_chain(node.func)
+            for k in self.track_funcs.keys():
+                if y.startswith(k):
+                    func_name = y[len(k)+1:]
+                    if func_name in self.track_funcs[k]:
+                        return node
+                    return None
+            # else:
+                # assert False
         return None
 
     def visit_Subscript(self, node):

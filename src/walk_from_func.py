@@ -187,13 +187,17 @@ def lets_go(filepath, target_func, routes=[]):
     modules = walker.modules_to_import
     simplifier = SimplifyAST(walker.references_per_module)
     output = {"asts": []}
+    interm = {"asts": []}
     for mod_name, func_dict in asts.items():
         for func_name, func_ast in func_dict.items():
             # print(ast.dump(simplifier.simplify_ast(func_ast, mod_name)))
-            simplified_ast = ast2json(simplifier.simplify_ast(func_ast, mod_name))
-            json_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": simplified_ast}
+            simplified_ast = simplifier.simplify_ast(func_ast, mod_name)
+            interm_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": simplified_ast}
+            json_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": ast2json(simplified_ast)}
+            interm["asts"].append(interm_func)
             output["asts"].append(json_func)
-    create_graph(current_filename, target_func, output["asts"])
+    graph = create_graph(current_filename, target_func, interm["asts"])
+    output["graph"] = graph
     print(json.dumps(output), file=sys.stdout, flush=True)
 
 # Example usage:
@@ -212,3 +216,4 @@ try:
         lets_go(filepath, func_name, routes=routes)
 except Exception as e:
     print(e, file=sys.stderr, flush=True)
+    # raise(e)

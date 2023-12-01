@@ -38,16 +38,16 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
   }
 
   // match user defined functions
-  // while ((match = funcPattern.exec(content))) {
-  //   if(matches["funcs"] === undefined) {
-  //     matches["funcs"] = [];
-  //   }
+  while ((match = funcPattern.exec(content))) {
+    if(matches["funcs"] === undefined) {
+      matches["funcs"] = [];
+    }
 
-  //   const lineCountBeforeMatch = content
-  //     .slice(0, match.index)
-  //     .split("\n").length;
-  //   matches["funcs"].push({ name: match[1], lineno: lineCountBeforeMatch });
-  // }
+    const lineCountBeforeMatch = content
+      .slice(0, match.index)
+      .split("\n").length;
+    matches["funcs"].push({ name: match[1], lineno: lineCountBeforeMatch - 1});
+  }
 
   // match flow-start(<flow-name>)
   while ((match = flowStartPattern.exec(content))) {
@@ -189,6 +189,15 @@ function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<s
   });
 }
 
+function pathsAreEqual(path1: string, path2: string) {
+  path1 = path.resolve(path1);
+  path2 = path.resolve(path2);
+  if (process.platform === "win32") {
+    return path1.toLowerCase() === path2.toLowerCase();
+  }
+  return path1 === path2;
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -235,7 +244,16 @@ export function activate(context: vscode.ExtensionContext) {
     panel.webview.onDidReceiveMessage((message) => {
       if (message.command === 'openFile' && message.filePath) {
           vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath)).then((document) => {
+            if (message.lineno) {
+              vscode.window.showTextDocument(document).then((editor) => {
+                editor.selections = [new vscode.Selection(message.lineno, 0, message.lineno, 0)];
+                var range = new vscode.Range(message.lineno, 0, message.lineno, 0);
+                editor.revealRange(range);
+              });
+            }
+            else {
               vscode.window.showTextDocument(document);
+            }
           });
       }
     });
@@ -245,17 +263,25 @@ export function activate(context: vscode.ExtensionContext) {
     "flow-documentation.countWords",
     () => {
       const endPoints = countWordsInFolders(context);
-      const [endP, flows] = extractFlowsAndEnpoints(endPoints);
+      const [endP, flows, funcs] = extractFlowsAndEnpoints(endPoints);
       for(let i = 0 ; i< flows.length ; ++i) {
         runPythonProg(flows[i], endP).then((result) => {
           if (result.errors.length) {
             result.errors.forEach(err => console.error(err));
             throw new Error();
           }
-          if (result.outputs.length > 1) {
+          if (result.outputs.length !== 1) {
             throw new Error("too much python output");
           }
           const data = JSON.parse(result.outputs[0]);
+
+          // match graph funcs with extracted funcs
+          for (let i = 0 ; i< data.graph.nodes.length ; i++) {
+            const node = data.graph.nodes[i];
+            const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
+            data.graph.nodes[i]["lineno"] = func[0].lineno;
+          }
+
           showGraph(data);
         })
         .catch((error) => {
@@ -288,7 +314,7 @@ function vscodePath(pp: string) {
 }
 
 // Inside the getWebviewContent function
-function getWebviewContent(panel: vscode.WebviewPanel, data: JSON, context: vscode.ExtensionContext ) {
+function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, context: vscode.ExtensionContext ) {
   const workspacePath = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : ''; // Assumes you have a workspace open
 
   if (!workspacePath) {
@@ -308,37 +334,50 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: JSON, context: vsco
   });
 
   const mermaidPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'mermaid.min.js'));
-  const mermaidSrc = panel.webview.asWebviewUri(mermaidPath);
+  const jqueryPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'jquery.min.js'));
+
+  let graph: String[] = ["graph TD"];
+  for (let i = 0 ; i < data.graph.edges.length; ++i) {
+    const [startId, endId] = data.graph.edges[i];
+    graph.push(`${data.graph.nodes[startId]['func_name']} --> ${data.graph.nodes[endId]['func_name']}`);
+  }
+  let graphString: String = graph.join('\\n');
+  // const mermaidSrc = panel.webview.asWebviewUri(mermaidPath);
 
 
-  return `<!DOCTYPE html>
+  let xd = `<!DOCTYPE html>
 <html>
     <head>
-      <script src="${mermaidSrc}"></script>
+      <script src="${panel.webview.asWebviewUri(mermaidPath)}"></script>
+      <script src="${panel.webview.asWebviewUri(jqueryPath)}"></script>
     </head>
   <body>
     <table>
       ${tableRows}
     </table>
-    ${data}
-    <div id="here">hello</div>
+    <div style="color:white;">
+      <div id="here">hello</div>
+    </div>
     <script>
       const vscode = acquireVsCodeApi();
-      function openFile(filePath) {
+      function openFile(filePath, lineno) {
         console.log(document);
-        vscode.postMessage({ command: 'openFile', filePath });
+        vscode.postMessage({ command: 'openFile', filePath, lineno});
       }
     </script>
     <script>
     async function ads () {
       mermaid.initialize({ startOnLoad: false });
-      const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "graph TD\\n Start --> Stop ");
+      const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "${graphString}");
+      const nodeData = JSON.parse('${replaceAll(JSON.stringify(data.graph.nodes), '\\', '/')}');
       console.log(htmlCode);
       document.getElementById('here').innerHTML = htmlCode.svg;
-  
       const nodes = document.querySelectorAll('.node');
         nodes.forEach(node => {
-            const textContent = node.querySelector('text').textContent;
+            const textContent = node.textContent;
+            console.log(node, textContent);
+            const nn = nodeData.filter((x) => x.func_name == textContent)[0];
+            node.onclick = () => {openFile(nn["file"], nn["lineno"])}; 
             if (parseInt(textContent, 10) % 2 === 0) {
                 node.classList.add('even');
             }
@@ -348,6 +387,7 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: JSON, context: vsco
     </script>
   </body>
 </html>`;
+  return xd;
 }
 
 function customFlattenObject(obj: Record<string, any>, parentKey: string = ''): Record<string, Object[]> {
@@ -358,7 +398,7 @@ function customFlattenObject(obj: Record<string, any>, parentKey: string = ''): 
       let newKey = parentKey ? `${parentKey}.${key}` : key;
 
       if (typeof obj[key] === 'object' && obj[key] !== null) {
-        if (['routes', 'flowStart', 'flowEnd', 'flowIgnore'].includes(key)) {
+        if (['funcs', 'routes', 'flowStart', 'flowEnd', 'flowIgnore'].includes(key)) {
           flattened[newKey] = obj[key];
         } else {
           Object.assign(flattened, customFlattenObject(obj[key], key));
@@ -372,9 +412,10 @@ function customFlattenObject(obj: Record<string, any>, parentKey: string = ''): 
   return flattened;
 }
 
-function extractFlowsAndEnpoints(endPoints: Record<string, any>): [any, any] {
+function extractFlowsAndEnpoints(endPoints: Record<string, any>): [any, any, LooseObject[]] {
   let routes: Object[] = [];
   let flows: Object[] = [];
+  let funcs: Object[] = [];
   let flat: Record<string, Object[]> = customFlattenObject(endPoints);
   for (const key of Object.keys(flat)) {
     const sp = key.split('.');
@@ -396,8 +437,14 @@ function extractFlowsAndEnpoints(endPoints: Record<string, any>): [any, any] {
         flows.push(newObject);
       }
     }
+    else if (sp[sp.length - 1] === 'funcs') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        funcs.push(newObject);
+      }
+    }
   }
 
-  return [routes, flows];
+  return [routes, flows, funcs];
 }
 
