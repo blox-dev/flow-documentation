@@ -377,7 +377,8 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
             const textContent = node.textContent;
             console.log(node, textContent);
             const nn = nodeData.filter((x) => x.func_name == textContent)[0];
-            node.onclick = () => {openFile(nn["file"], nn["lineno"])}; 
+            node.onclick = () => {openFile(nn["file"], nn["lineno"])};
+            node.style.cursor = "pointer";
             if (parseInt(textContent, 10) % 2 === 0) {
                 node.classList.add('even');
             }

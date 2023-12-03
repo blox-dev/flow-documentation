@@ -79,6 +79,7 @@ class ImportVisitor(ast.NodeVisitor):
             else:
                 self.modules_to_import[new_imp][1].update(new_funcs)
         for mod_name, funcs in tfs.items():
+            self.references_per_module[self.current_module][mod_name].update(funcs)
             self.target_funcs[mod_name].update(funcs)
 
         for mod_name, funcs in self.target_funcs.items():
@@ -94,7 +95,8 @@ class ImportVisitor(ast.NodeVisitor):
             tree = ast.parse(text)
             iv = ImportVisitor(mod_name, {mod_name: funcs}, self.modules_to_import, self.already_visited)
             iv.visit(tree)
-            self.references_per_module[mod_name].update(iv.references_per_module[mod_name])
+            for k in iv.references_per_module.keys():
+                self.references_per_module[k].update(iv.references_per_module[k])
             self.imported_modules.add(mod_name)
 
             for mod_name, d in iv.asts.items():

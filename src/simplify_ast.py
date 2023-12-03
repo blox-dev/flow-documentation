@@ -25,9 +25,7 @@ class SimplifyAST(ast.NodeTransformer):
         if not isinstance(astt, AST):
             astt = ast.parse(astt)
         self.track_mod_name = mod_name
-        # TODO: something is wrong with the function references here
-        self.track_funcs = self.function_references["gpt"]
-        # self.track_funcs = self.function_references[mod_name]
+        self.track_funcs = self.function_references[mod_name]
         simplified_tree = self.visit(astt)
         return simplified_tree
 
