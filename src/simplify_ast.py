@@ -19,12 +19,10 @@ class SimplifyAST(ast.NodeTransformer):
         self.function_references = funcs
         self.imports = set()
         self.track_funcs = dict()
-        self.track_mod_name = ""
 
     def simplify_ast(self, astt, mod_name):
         if not isinstance(astt, AST):
             astt = ast.parse(astt)
-        self.track_mod_name = mod_name
         self.track_funcs = self.function_references[mod_name]
         simplified_tree = self.visit(astt)
         return simplified_tree
@@ -255,6 +253,9 @@ class SimplifyAST(ast.NodeTransformer):
         return None
 
     def visit_Call(self, node):
+        # keep route nodes
+        if hasattr(node, 'is_route') and node.is_route:
+            return node
         if isinstance(node.func, ast.Name):
             # Handle simple function calls like "foo()"
             for v in self.track_funcs.values():

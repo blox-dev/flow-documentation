@@ -279,7 +279,13 @@ export function activate(context: vscode.ExtensionContext) {
           for (let i = 0 ; i< data.graph.nodes.length ; i++) {
             const node = data.graph.nodes[i];
             const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
-            data.graph.nodes[i]["lineno"] = func[0].lineno;
+            // TODO: remove if condition, dummy check
+            if (func.length) {
+              data.graph.nodes[i]["lineno"] = func[0].lineno;
+            }
+            else {
+              data.graph.nodes[i]["lineno"] = 0;
+            }
           }
 
           showGraph(data);
@@ -375,12 +381,14 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
       const nodes = document.querySelectorAll('.node');
         nodes.forEach(node => {
             const textContent = node.textContent;
-            console.log(node, textContent);
             const nn = nodeData.filter((x) => x.func_name == textContent)[0];
             node.onclick = () => {openFile(nn["file"], nn["lineno"])};
             node.style.cursor = "pointer";
-            if (parseInt(textContent, 10) % 2 === 0) {
-                node.classList.add('even');
+            if (nn.is_route && nn.is_route == true) {
+              const rect = node.getElementsByTagName('rect')[0];
+              console.log(textContent, node, rect);
+              rect.style.fill = "lightblue";
+              rect.style.stroke = "lightblue";
             }
         });
     }

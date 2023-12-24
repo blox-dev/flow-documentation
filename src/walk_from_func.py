@@ -1,5 +1,6 @@
 import ast
 import importlib.util
+import re
 import sys
 from collections import defaultdict
 from simplify_ast import SimplifyAST
@@ -35,7 +36,7 @@ class ImportVisitor(ast.NodeVisitor):
         self.target_funcs = defaultdict(set, target_funcs) # {"mod1": {"func1", "func2"}, "mod2": {func1, func2}}
         self.already_visited = defaultdict(set, already_visited) # {"mod1": {func1", "func2"}, "mod2": {func1, func2}}
         self.modules_to_import = defaultdict(lambda: ("", set()), modules_to_import) # {"name": ("path", {"func1", "func2"})}
-        self.imported_modules = set() # {"name", "name2"}
+        self.imported_modules = set(already_visited.keys()) # {"name", "name2"}
         self.asts = defaultdict(lambda: defaultdict(set))
         self.references_per_module = defaultdict(lambda: defaultdict(set))
 
@@ -78,6 +79,7 @@ class ImportVisitor(ast.NodeVisitor):
                 self.modules_to_import[new_imp] = (m_file, new_funcs)
             else:
                 self.modules_to_import[new_imp][1].update(new_funcs)
+            self.references_per_module[self.current_module][new_imp].update(new_funcs)
         for mod_name, funcs in tfs.items():
             self.references_per_module[self.current_module][mod_name].update(funcs)
             self.target_funcs[mod_name].update(funcs)
@@ -97,14 +99,29 @@ class ImportVisitor(ast.NodeVisitor):
             iv.visit(tree)
             for k in iv.references_per_module.keys():
                 self.references_per_module[k].update(iv.references_per_module[k])
+                # TODO: references from new module should be somehow added to the current module references
+                # self.references_per_module[self.current_module].update(iv.references_per_module[k])
             self.imported_modules.add(mod_name)
 
             for mod_name, d in iv.asts.items():
                 self.asts[mod_name].update(iv.asts[mod_name])
         return node
 
+class ArgsVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.res_string = "/"
+        self.first_string = False
 
-class FunctionVisitor(ast.NodeVisitor):
+    def visit_Name(self, node):
+        if self.first_string:
+            self.res_string += '([^/]+)/' 
+    
+    def visit_Constant(self, node):
+        self.first_string = True
+        self.res_string += node.value.replace('/', '').replace('\\', '') + '/'
+
+# NodeTransformer instead of NodeVisitor to mark nodes which reference a route
+class FunctionVisitor(ast.NodeTransformer):
     def __init__(self, target_module, tracked_function, modules_to_import, already_visited):
         self.current_module = target_module # str
         self.tracked_function = tracked_function
@@ -151,6 +168,25 @@ class FunctionVisitor(ast.NodeVisitor):
         elif isinstance(node.func, ast.Attribute):
             # Handle method calls like "obj.method()"
             y = self._get_attribute_chain(node.func)
+            # handle requests.get(...)
+            unp = ast.unparse(node)
+            if "requests.get" in unp:
+                av = ArgsVisitor()
+                if len(node.args):
+                    # url is first argument
+                    av.visit(node.args[0])
+                else:
+                   for named_arg in node.keywords:
+                       if named_arg.arg == 'url':
+                           av.visit(named_arg.value)
+                           break
+                endpoint = av.res_string
+                for route in routes:
+                    if re.match(endpoint, route.get('name','')):
+                        # add endpoint as information to the node
+                        node.is_route = True
+                        node.endpoint = endpoint
+                        break
             for k in self.modules_to_import.keys():
                 if y.startswith(k):
                     func_name = y[len(k)+1:]
@@ -159,7 +195,7 @@ class FunctionVisitor(ast.NodeVisitor):
                     break
             # else:
                 # assert False
-        self.generic_visit(node)
+        return self.generic_visit(node)
 
     def _get_attribute_chain(self, node):
         if isinstance(node, ast.Name):
@@ -169,8 +205,16 @@ class FunctionVisitor(ast.NodeVisitor):
         return None
 
 
+def parse_routes(routes):
+    for route in routes:
+        if "name" not in route:
+            continue
+        stripped = route["name"].strip(' /\\')
+        route["name"] = '/' + stripped + '/' if len(stripped) else '/'
+    return routes
 
 def lets_go(filepath, target_func, routes=[]):
+    routes = parse_routes(routes)
     path = Path(filepath)
     current_filename = path.stem
     
@@ -204,18 +248,22 @@ def lets_go(filepath, target_func, routes=[]):
 
 # Example usage:
 # if __name__ == "__main__":
+sample_routes = json.loads(r'[{"name":"/keys","lineno":23,"func":"create_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":37,"func":"read_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":50,"func":"update_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":62,"func":"delete_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/debug","lineno":78,"func":"print_database","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/logout","lineno":31,"func":"logout","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/register","lineno":38,"func":"register","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/login","lineno":86,"func":"login","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/","lineno":120,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/<path>","lineno":121,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"}]')
+routes = sample_routes
 try:
     argc = len(sys.argv)
     # print(sys.argv, argc)
     if argc < 3:
-        lets_go("F:\Facultate\Master2\Thesis\code\gpt.py", "parse_code")
+        lets_go(r"F:\Facultate\Master2\Thesis\code\demo\users-microservice\gpt.py", "parse_code", routes=sample_routes)
     else:
         filepath = sys.argv[1]
         func_name = sys.argv[2]
         routes = []
-        # if argc == 4:
-        #     routes = json.loads(sys.arg[3])
+        if argc == 4:
+            routes = json.loads(sys.argv[3])
+        else:
+            routes = sample_routes
         lets_go(filepath, func_name, routes=routes)
 except Exception as e:
     print(e, file=sys.stderr, flush=True)
-    # raise(e)
+    raise(e)
