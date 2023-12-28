@@ -31,7 +31,7 @@ def is_module_user_defined(name):
         return False
 
 class ImportVisitor(ast.NodeVisitor):
-    def __init__(self, target_module, target_funcs, modules_to_import, already_visited):
+    def __init__(self, target_module, target_funcs, modules_to_import, already_visited, routes = dict()):
         self.current_module = target_module # str
         self.target_funcs = defaultdict(set, target_funcs) # {"mod1": {"func1", "func2"}, "mod2": {func1, func2}}
         self.already_visited = defaultdict(set, already_visited) # {"mod1": {func1", "func2"}, "mod2": {func1, func2}}
@@ -39,6 +39,7 @@ class ImportVisitor(ast.NodeVisitor):
         self.imported_modules = set(already_visited.keys()) # {"name", "name2"}
         self.asts = defaultdict(lambda: defaultdict(set))
         self.references_per_module = defaultdict(lambda: defaultdict(set))
+        self.routes = routes
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -67,7 +68,7 @@ class ImportVisitor(ast.NodeVisitor):
         
         self.asts[self.current_module].update({node.name: node})
 
-        fw = FunctionVisitor(self.current_module, node.name, self.modules_to_import, self.already_visited)
+        fw = FunctionVisitor(self.current_module, node.name, self.modules_to_import, self.already_visited, self.routes)
         fw.visit(node)
         imps = fw.modules_to_import
         tfs = fw.function_references
@@ -95,7 +96,7 @@ class ImportVisitor(ast.NodeVisitor):
             with open(mod_file, 'r') as f:
                 text = f.read()
             tree = ast.parse(text)
-            iv = ImportVisitor(mod_name, {mod_name: funcs}, self.modules_to_import, self.already_visited)
+            iv = ImportVisitor(mod_name, {mod_name: funcs}, self.modules_to_import, self.already_visited, self.routes)
             iv.visit(tree)
             for k in iv.references_per_module.keys():
                 self.references_per_module[k].update(iv.references_per_module[k])
@@ -122,12 +123,13 @@ class ArgsVisitor(ast.NodeVisitor):
 
 # NodeTransformer instead of NodeVisitor to mark nodes which reference a route
 class FunctionVisitor(ast.NodeTransformer):
-    def __init__(self, target_module, tracked_function, modules_to_import, already_visited):
+    def __init__(self, target_module, tracked_function, modules_to_import, already_visited, routes):
         self.current_module = target_module # str
         self.tracked_function = tracked_function
         self.already_visited = already_visited # {"mod1": {"func1", "func2"}, "mod2": {func1, func2}}
         self.modules_to_import = defaultdict(lambda: ("", set()), modules_to_import) # {"name": ("path", {"func1", "func2"})}
         self.function_references = defaultdict(set)
+        self.routes = routes
 
         # set current file path if not present
         if self.current_module not in self.modules_to_import:
@@ -181,12 +183,16 @@ class FunctionVisitor(ast.NodeTransformer):
                            av.visit(named_arg.value)
                            break
                 endpoint = av.res_string
-                for route in routes:
+                for route in self.routes:
                     if re.match(endpoint, route.get('name','')):
                         # add endpoint as information to the node
                         node.is_route = True
-                        node.endpoint = endpoint
+                        node.route = route
                         break
+                else:
+                    # Unknown/exterior route, show add dummy node in graph
+                    node.is_route = True
+
             for k in self.modules_to_import.keys():
                 if y.startswith(k):
                     func_name = y[len(k)+1:]
@@ -227,7 +233,7 @@ def lets_go(filepath, target_func, routes=[]):
     with open(filepath, 'r') as f:
         code = f.read()
     tree = ast.parse(code)
-    walker = ImportVisitor(current_filename, {current_filename: {target_func}}, dict(), dict())
+    walker = ImportVisitor(current_filename, {current_filename: {target_func}}, dict(), dict(), routes)
     walker.visit(tree)
     asts = walker.asts
     modules = walker.modules_to_import
@@ -248,8 +254,7 @@ def lets_go(filepath, target_func, routes=[]):
 
 # Example usage:
 # if __name__ == "__main__":
-sample_routes = json.loads(r'[{"name":"/keys","lineno":23,"func":"create_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":37,"func":"read_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":50,"func":"update_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/keys/<key>","lineno":62,"func":"delete_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/debug","lineno":78,"func":"print_database","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\fullstack_tutorial-master\\backend\\main.py"},{"name":"/logout","lineno":31,"func":"logout","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/register","lineno":38,"func":"register","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/login","lineno":86,"func":"login","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/","lineno":120,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"},{"name":"/<path>","lineno":121,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\sample-flask-bootstrap-main\\app\\views.py"}]')
-routes = sample_routes
+sample_routes = json.loads(r'[{"module":"main","name":"/keys","lineno":23,"func":"create_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\fullstack_tutorial-master\\backend\\main.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"main","name":"/keys/<key>","lineno":37,"func":"read_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\fullstack_tutorial-master\\backend\\main.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"main","name":"/keys/<key>","lineno":50,"func":"update_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\fullstack_tutorial-master\\backend\\main.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"main","name":"/keys/<key>","lineno":62,"func":"delete_name","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\fullstack_tutorial-master\\backend\\main.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"main","name":"/debug","lineno":78,"func":"print_database","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\fullstack_tutorial-master\\backend\\main.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"views","name":"/logout","lineno":31,"func":"logout","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\sample-flask-bootstrap-main\\app\\views.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"views","name":"/register","lineno":38,"func":"register","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\sample-flask-bootstrap-main\\app\\views.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"views","name":"/login","lineno":86,"func":"login","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\sample-flask-bootstrap-main\\app\\views.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"views","name":"/","lineno":120,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\sample-flask-bootstrap-main\\app\\views.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"},{"module":"views","name":"/<path>","lineno":121,"func":"index","file":"f:\\Facultate\\Master2\\Thesis\\code\\demo\\users-microservice\\sample-flask-bootstrap-main\\app\\views.py","project_path":"f:\\facultate\\master2\\thesis\\code\\demo\\users-microservice","project_color":"#00008b"}]')
 try:
     argc = len(sys.argv)
     # print(sys.argv, argc)

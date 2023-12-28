@@ -4,10 +4,15 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
-import { assert } from "console";
+// import * as zlib from 'zlib';
 
-function extractWordCounts(filePath: string): Record<string, Record<string, any>[]> {
+interface LooseObject {
+  [key: string]: any
+}
+
+function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
   const content = fs.readFileSync(filePath, "utf8");
+  const modName = path.basename(filePath, path.extname(filePath));
 
   const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g; // Use a regular expression to find the word "count"
   const funcPattern = /def\s+(.+)\s*\(.*\)\s*:/g;
@@ -15,7 +20,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
 
   var match;
-  var matches: Record<string, Record<string, any>[]> = {};
+  var matches: Record<string, LooseObject[]> = {};
   
 
   // match routes
@@ -31,7 +36,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["routes"].push({ name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches["routes"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -46,7 +51,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
-    matches["funcs"].push({ name: match[1], lineno: lineCountBeforeMatch - 1});
+    matches["funcs"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch - 1});
   }
 
   // match flow-start(<flow-name>)
@@ -62,7 +67,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["flowStart"].push({ name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches["flowStart"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -81,7 +86,7 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["flowEnd"].push({ name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches["flowEnd"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -91,41 +96,82 @@ function extractWordCounts(filePath: string): Record<string, Record<string, any>
 }
 
 function countWordsInFolders(context: vscode.ExtensionContext) {
-  var folders: string[] = vscode.workspace.workspaceFolders
+  var monoRepos: string[] = vscode.workspace.workspaceFolders
     ? vscode.workspace.workspaceFolders.map((x) => x.uri.fsPath)
     : [];
 
   const config = vscode.workspace.getConfiguration("wordCounter");
-  folders.push(...config.get("extraFolders", []));
-  const wordCounts: Record<string, any> = {};
+  monoRepos.push(...config.get("extraFolders", []));
+  const wordCounts: LooseObject = {};
 
-  folders.forEach((folder) => {
-    const folderPath = path.isAbsolute(folder)
-      ? folder
-      : vscode.workspace.workspaceFolders
-      ? path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, folder)
-      : null;
-    if (folderPath === null) {
-      return;
+  // List of some distinct colors for the different projects routes
+  // TODO: extend the list for more project, or introduce algorithm to generate
+  // 1 color per each folder (maximally distinct)
+  // const colors = ["#228b22", "#00008b", "#b03060", "#ff4500", "#ffff00", "#deb887", "#00ff00", "#00ffff", "#ff00ff", "#6495ed"];
+  const colors = ["#7f9f9f", "#72cb72", "#c05050", "#ffff50", "#50ff50", "#e450f3", "#50ffff", "#6ee0ff", "#fffefd", "#ffa9f4"];
+  let colorIndex = 0;
+
+  let routes: LooseObject[] = [];
+  let flows: LooseObject[] = [];
+  let funcs: LooseObject[] = [];
+
+  monoRepos.forEach((monoRepo) => {
+    // IMPORTANT: assumes monolithic architecture of the repository (folder),
+    // where each subfolder represents a different project
+    const files = fs.readdirSync(monoRepo, { withFileTypes: true });
+    const folders = files.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
+    if (files.length > folders.length) {
+      vscode.window.showWarningMessage(`The repository ${monoRepo} might not have assumed structure`);
     }
-    // normalize folderpath
-    const folderPathNorm = path.resolve(folderPath).toLowerCase();
-    if (wordCounts[folderPathNorm]) {
-      return;
-    }
-    const subfolderCounts = countWordsInSubfolders(folderPath);
-    wordCounts[folderPathNorm] = subfolderCounts;
+    folders.forEach((folder) => {
+      const folderPath = path.isAbsolute(folder)
+        ? folder
+        : vscode.workspace.workspaceFolders
+        ? path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, folder)
+        : null;
+      if (folderPath === null) {
+        return;
+      }
+      // normalize folderpath
+      const folderPathNorm = path.resolve(folderPath).toLowerCase();
+      if (wordCounts[folderPathNorm]) {
+        return;
+      }
+      const subfolderCounts = countWordsInSubfolders(folderPath);
+
+      // Add project info to each function and funcs
+      let [projectRoutes, projectFlows, projectFuncs] = extractFlowsAndEnpoints(subfolderCounts);
+      
+      if (!(projectRoutes.length || projectFlows.length || projectFuncs.length)) {
+        // empty project
+        return;
+      }
+      let projectColor = colors[colorIndex++];
+      
+      for (let i = 0; i < projectRoutes.length; ++i) {
+        projectRoutes[i].project_path = folderPathNorm;
+        projectRoutes[i].project_color = projectColor;
+      }
+      for (let i = 0; i < projectFuncs.length; ++i) {
+        projectFuncs[i].project_path = folderPathNorm;
+        projectFuncs[i].project_color = projectColor;
+      }
+
+      routes.push(...projectRoutes);
+      flows.push(...projectFlows);
+      funcs.push(...projectFuncs);
+    });
+
+    // if(Object.keys(wordCounts).length === 1) {
+    //   return wordCounts[Object.keys(wordCounts)[0]];
+    // }
   });
-
-  // if(Object.keys(wordCounts).length === 1) {
-  //   return wordCounts[Object.keys(wordCounts)[0]];
-  // }
-  return wordCounts;
+  return [routes, flows, funcs];
 }
 
-function countWordsInSubfolders(folderPath: string): Record<string, any> {
+function countWordsInSubfolders(folderPath: string): LooseObject {
   const files = fs.readdirSync(folderPath, { withFileTypes: true });
-  const subfolderCounts: Record<string, any> = {};
+  const subfolderCounts: LooseObject = {};
 
   files.forEach((file) => {
     const filePath = path.join(folderPath, file.name);
@@ -155,14 +201,73 @@ function countWordsInSubfolders(folderPath: string): Record<string, any> {
   return subfolderCounts;
 }
 
-interface LooseObject {
-  [key: string]: any
+function extractFlowsAndEnpoints(endPoints: LooseObject): [LooseObject[], LooseObject[], LooseObject[]] {
+  let routes: LooseObject[] = [];
+  let flows: LooseObject[] = [];
+  let funcs: LooseObject[] = [];
+  let flat: Record<string, Object[]> = customFlattenObject(endPoints);
+  for (const key of Object.keys(flat)) {
+    const sp = key.split('.');
+    if (sp[sp.length - 1] === 'routes') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        routes.push(newObject);
+      }
+    }
+    else if (sp[sp.length - 1] === 'flowStart') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        flows.push(newObject);
+      }
+    }
+    else if (sp[sp.length - 1] === 'flowEnd') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        flows.push(newObject);
+      }
+    }
+    else if (sp[sp.length - 1] === 'funcs') {
+      for (let i = 0; i < flat[key].length ; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+        funcs.push(newObject);
+      }
+    }
+  }
+
+  return [routes, flows, funcs];
+}
+
+function customFlattenObject(obj: LooseObject, parentKey: string = ''): Record<string, Object[]> {
+  let flattened: Record<string, Object[]> = {};
+
+  for (let key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      let newKey = parentKey ? `${parentKey}.${key}` : key;
+
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
+        if (['funcs', 'routes', 'flowStart', 'flowEnd', 'flowIgnore'].includes(key)) {
+          flattened[newKey] = obj[key];
+        } else {
+          Object.assign(flattened, customFlattenObject(obj[key], key));
+        }
+      } else {
+        flattened[newKey] = obj[key];
+      }
+    }
+  }
+
+  return flattened;
 }
 
 function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<string, string[]>> {
   return new Promise((resolve, reject) => {
     const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
     const endP = JSON.stringify(endPoints);
+    
+    // // Consider if argument size gets too large
+    // console.log(endP.length);
+    // const comp = zlib.gzipSync(endP).toString('base64');
+    // console.log(comp.length);
     var output: string[] = [];
     var errors: string[] = [];
     // Run the Python script with the JSON argument
@@ -237,9 +342,10 @@ export function activate(context: vscode.ExtensionContext) {
     // Load an HTML file or generate HTML content with the graph here
     panel.webview.html = getWebviewContent(panel, data, context);
 
+    //vscode.debug.addBreakpoints();
+    
     // In your WebView
     // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
-
     // In your extension
     panel.webview.onDidReceiveMessage((message) => {
       if (message.command === 'openFile' && message.filePath) {
@@ -262,8 +368,7 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable2 = vscode.commands.registerCommand(
     "flow-documentation.countWords",
     () => {
-      const endPoints = countWordsInFolders(context);
-      const [endP, flows, funcs] = extractFlowsAndEnpoints(endPoints);
+      const [endP, flows, funcs] = countWordsInFolders(context);
       for(let i = 0 ; i< flows.length ; ++i) {
         runPythonProg(flows[i], endP).then((result) => {
           if (result.errors.length) {
@@ -274,17 +379,41 @@ export function activate(context: vscode.ExtensionContext) {
             throw new Error("too much python output");
           }
           const data = JSON.parse(result.outputs[0]);
-
           // match graph funcs with extracted funcs
           for (let i = 0 ; i< data.graph.nodes.length ; i++) {
-            const node = data.graph.nodes[i];
-            const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
-            // TODO: remove if condition, dummy check
-            if (func.length) {
-              data.graph.nodes[i]["lineno"] = func[0].lineno;
+            let node = data.graph.nodes[i];
+
+            // Node is a http call
+            let unknownNode = false;
+
+            if (node.is_route) {
+              const route = endP.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func === node.func_name);
+              if (route.length) {
+                node.lineno = route[0].lineno;
+                node.project_path = route[0].project_path;
+                node.project_color = route[0].project_color;
+              }
+              else {
+                unknownNode = true;
+              }
             }
+            // Node is a function call
             else {
-              data.graph.nodes[i]["lineno"] = 0;
+              const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
+              // TODO: remove if condition, dummy check
+              if (func.length) {
+                node.lineno = func[0].lineno;
+                node.project_path = func[0].project_path;
+                node.project_color = func[0].project_color;
+              }
+              else {
+                unknownNode = true;
+              }
+            }
+            if (unknownNode) {
+              node.lineno = 0;
+              node.project_path = "dummy";
+              node.project_color = "#ff0000"; // red
             }
           }
 
@@ -295,8 +424,8 @@ export function activate(context: vscode.ExtensionContext) {
         });
       }
 
-      context.globalState.update("endPointMap", endPoints);
-      vscode.window.showInformationMessage(JSON.stringify(endPoints));
+      // context.globalState.update("endPointMap", endPoints);
+      // vscode.window.showInformationMessage(JSON.stringify(endPoints));
     }
   );
 
@@ -331,7 +460,6 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
   const filesInWorkspace = [
       // { name: 'File 1', path: 'F:/Facultate/Master2/Thesis/code/extensions/flow-documentation/src/ast2json.py' },
       { name: 'File 1', path:  vscodePath(path.join(context.extensionPath, 'src/ast2json.py')) },
-      { name: 'File 2', path: 'path/to/your/file2' },
       // Add more files as needed
   ];
 
@@ -377,18 +505,24 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
       const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "${graphString}");
       const nodeData = JSON.parse('${replaceAll(JSON.stringify(data.graph.nodes), '\\', '/')}');
       console.log(htmlCode);
+      console.log(nodeData);
       document.getElementById('here').innerHTML = htmlCode.svg;
       const nodes = document.querySelectorAll('.node');
         nodes.forEach(node => {
             const textContent = node.textContent;
             const nn = nodeData.filter((x) => x.func_name == textContent)[0];
+            console.log(textContent, node, nn);
             node.onclick = () => {openFile(nn["file"], nn["lineno"])};
             node.style.cursor = "pointer";
             if (nn.is_route && nn.is_route == true) {
               const rect = node.getElementsByTagName('rect')[0];
-              console.log(textContent, node, rect);
-              rect.style.fill = "lightblue";
-              rect.style.stroke = "lightblue";
+              console.log(rect);
+              console.log(nn);
+              rect.style.fill = nn.project_color;
+              rect.style.stroke = nn.project_color;
+              if (nn.project_color === '#ff0000') {
+                node.style.cursor = "not-allowed";
+              }
             }
         });
     }
@@ -398,62 +532,3 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
 </html>`;
   return xd;
 }
-
-function customFlattenObject(obj: Record<string, any>, parentKey: string = ''): Record<string, Object[]> {
-  let flattened: Record<string, Object[]> = {};
-
-  for (let key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      let newKey = parentKey ? `${parentKey}.${key}` : key;
-
-      if (typeof obj[key] === 'object' && obj[key] !== null) {
-        if (['funcs', 'routes', 'flowStart', 'flowEnd', 'flowIgnore'].includes(key)) {
-          flattened[newKey] = obj[key];
-        } else {
-          Object.assign(flattened, customFlattenObject(obj[key], key));
-        }
-      } else {
-        flattened[newKey] = obj[key];
-      }
-    }
-  }
-
-  return flattened;
-}
-
-function extractFlowsAndEnpoints(endPoints: Record<string, any>): [any, any, LooseObject[]] {
-  let routes: Object[] = [];
-  let flows: Object[] = [];
-  let funcs: Object[] = [];
-  let flat: Record<string, Object[]> = customFlattenObject(endPoints);
-  for (const key of Object.keys(flat)) {
-    const sp = key.split('.');
-    if (sp[sp.length - 1] === 'routes') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
-        routes.push(newObject);
-      }
-    }
-    else if (sp[sp.length - 1] === 'flowStart') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
-        flows.push(newObject);
-      }
-    }
-    else if (sp[sp.length - 1] === 'flowEnd') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
-        flows.push(newObject);
-      }
-    }
-    else if (sp[sp.length - 1] === 'funcs') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
-        funcs.push(newObject);
-      }
-    }
-  }
-
-  return [routes, flows, funcs];
-}
-

@@ -3,6 +3,9 @@ import ast
 def is_same_function(f1, f2):
     return f1["module"] == f2["module"] and f1["func_name"] == f2["func_name"]
 
+def is_same_node(f1, f2):
+    return f1["module"] == f2["module"] and f1["func_name"] == f2["func_name"] and f1["file"] == f2["file"]
+
 def get_func_id_by_name(name, listfs):
     return list(filter(lambda x: x["func_name"] == name, listfs))[0]["id"]
 
@@ -13,6 +16,7 @@ class GraphMaker(ast.NodeVisitor):
         # set of edges
         self.graph = set()
         self.max_id = max_id
+        self.visited_nodes = set()
 
     def _get_attribute_chain(self, node):
         if isinstance(node, ast.Name):
@@ -21,12 +25,31 @@ class GraphMaker(ast.NodeVisitor):
             return f"{self._get_attribute_chain(node.value)}.{node.attr}"
         return None
 
+    def _node_exists(new_dict, list_of_dicts):
+        for existing_dict in list_of_dicts:
+            if len(new_dict) == len(existing_dict) and all(new_dict[key] == existing_dict[key] for key in new_dict):
+                return True
+        return False
+
     def visit_Call(self, node):
         if hasattr(node, 'is_route') and node.is_route:
             # TODO: actually import the route nodes and parse them instead of dummy nodes
-            self.nodes.append({'module': 'dummy', 'file': 'dummy', 'func_name': self._get_attribute_chain(node.func) , 'ast': None, 'id': self.max_id, 'is_route': True})
-            self.graph.add((self.current_node, self.max_id))
-            self.max_id += 1
+            
+            if hasattr(node, 'route') and node.route:
+                for n in self.nodes:
+                    if is_same_node(node.route, n):
+                       self.graph.add((self.current_node, n['id']))
+                       break 
+                else:
+                    # unvisited external node, create dummy with some info at least
+                    self.nodes.append({'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func"] , 'ast': None, 'id': self.max_id, 'is_route': True})
+                    self.graph.add((self.current_node, self.max_id))
+                    self.max_id += 1
+            else:
+                # the route is unknown / external
+                self.nodes.append({'module': 'dummy', 'file': 'dummy', 'func_name': self._get_attribute_chain(node.func) , 'ast': None, 'id': self.max_id, 'is_route': True})
+                self.graph.add((self.current_node, self.max_id))
+                self.max_id += 1
             return
         if isinstance(node.func, ast.Name):
             # Handle simple function calls like "foo()"
@@ -34,7 +57,8 @@ class GraphMaker(ast.NodeVisitor):
                 if node.func.id == n["func_name"]:
                     self.graph.add((self.current_node, n['id']))
                     # avoid recursion, but still append it to the graph
-                    if n['id'] != self.current_node:
+                    if n['id'] not in self.visited_nodes:
+                        self.visited_nodes.add(n['id'])
                         old_node = self.current_node
                         self.current_node = n['id']
                         self.visit(n["ast"])

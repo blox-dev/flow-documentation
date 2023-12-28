@@ -29,7 +29,7 @@
       "properties": {
         "wordCounter.extraFolders": {
           "type": "array",
-          "//default": [".", "F://Facultate/Master2/Thesis"],
+          "//default": [".", "F://Facultate/Master2/Thesis/code/demo"],
           "default": [],
           "description": "List of extra folders to scan."
         }
