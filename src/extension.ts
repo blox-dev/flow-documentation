@@ -25,8 +25,8 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
 
   // match routes
   while ((match = routePattern.exec(content))) {
-    if(matches["routes"] === undefined) {
-      matches["routes"] = [];
+    if(matches.routes === undefined) {
+      matches.routes = [];
     }
 
     const lineCountBeforeMatch = content
@@ -36,7 +36,7 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["routes"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.routes.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -44,20 +44,20 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
 
   // match user defined functions
   while ((match = funcPattern.exec(content))) {
-    if(matches["funcs"] === undefined) {
-      matches["funcs"] = [];
+    if(matches.funcs === undefined) {
+      matches.funcs = [];
     }
 
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
-    matches["funcs"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch - 1});
+    matches.funcs.push({module: modName, name: match[1], lineno: lineCountBeforeMatch - 1});
   }
 
   // match flow-start(<flow-name>)
   while ((match = flowStartPattern.exec(content))) {
-    if(matches["flowStart"] === undefined) {
-      matches["flowStart"] = [];
+    if(matches.flowStart === undefined) {
+      matches.flowStart = [];
     }
 
     const lineCountBeforeMatch = content
@@ -67,7 +67,7 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["flowStart"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.flowStart.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -75,8 +75,8 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
 
   // match flow-end(<flow-name>)
   while ((match = flowEndPattern.exec(content))) {
-    if(matches["flowEnd"] === undefined) {
-      matches["flowEnd"] = [];
+    if(matches.flowEnd === undefined) {
+      matches.flowEnd = [];
     }
 
     const lineCountBeforeMatch = content
@@ -86,7 +86,7 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches["flowEnd"].push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.flowEnd.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
         break;
       }
     }
@@ -121,7 +121,7 @@ function countWordsInFolders(context: vscode.ExtensionContext) {
     const files = fs.readdirSync(monoRepo, { withFileTypes: true });
     const folders = files.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
     if (files.length > folders.length) {
-      vscode.window.showWarningMessage(`The repository ${monoRepo} might not have assumed structure`);
+    vscode.window.showWarningMessage(`The color-coding of ${monoRepo} might appear wrong.`);
     }
     folders.forEach((folder) => {
       const folderPath = path.isAbsolute(folder)
@@ -351,16 +351,25 @@ export function activate(context: vscode.ExtensionContext) {
       if (message.command === 'openFile' && message.filePath) {
           vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath)).then((document) => {
             if (message.lineno) {
-              vscode.window.showTextDocument(document).then((editor) => {
-                editor.selections = [new vscode.Selection(message.lineno, 0, message.lineno, 0)];
-                var range = new vscode.Range(message.lineno, 0, message.lineno, 0);
-                editor.revealRange(range);
+              vscode.window.showTextDocument(document, {}).then((editor) => {
+                  var range = new vscode.Range(message.lineno, 0, message.lineno, 0);
+                  editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
               });
-            }
-            else {
+            } else {
               vscode.window.showTextDocument(document);
             }
           });
+      } else if(message.command === 'addBreakpoint' && message.filePath && message.lineno) {
+        // TODO: no way to visually display to the user that there is a breakpoint in the actual file
+        // can show in the graph though, but that's about it. With no support for launching the
+        // functions from the graph, it's just confusing
+
+        // +1 because the lineno points at the function header, not the function code
+        const range = new vscode.Range(message.lineno + 1, 0, message.lineno + 1, 0);
+        const location = new vscode.Location(vscode.Uri.file(message.filePath), range);
+        const brk = new vscode.SourceBreakpoint(location);
+        vscode.debug.addBreakpoints([brk]);
+        null;
       }
     });
   };
@@ -456,17 +465,6 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
       return '<p>No workspace open.</p>';
   }
 
-  
-  const filesInWorkspace = [
-      // { name: 'File 1', path: 'F:/Facultate/Master2/Thesis/code/extensions/flow-documentation/src/ast2json.py' },
-      { name: 'File 1', path:  vscodePath(path.join(context.extensionPath, 'src/ast2json.py')) },
-      // Add more files as needed
-  ];
-
-  const tableRows = filesInWorkspace.map((file) => {
-      return `<tr><td><a href="#" onclick="openFile('${file.path}')">${file.name}</a></td></tr>`;
-  });
-
   const mermaidPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'mermaid.min.js'));
   const jqueryPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'jquery.min.js'));
 
@@ -484,35 +482,109 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
     <head>
       <script src="${panel.webview.asWebviewUri(mermaidPath)}"></script>
       <script src="${panel.webview.asWebviewUri(jqueryPath)}"></script>
-    </head>
+      <style>
+      #menu {
+        position: fixed;
+        z-index: 9999; /* Most times is 2000 used as middle */
+        visibility: hidden;
+        opacity: 0;
+
+        padding: 0px;
+        font-family: sans-serif;
+        font-size: 11px;
+        background: #fff;
+        color: #555;
+        border: 1px solid #C6C6C6;
+
+        -webkit-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+        -moz-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+        box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+      }
+
+      #menu a {
+        display: block;
+        color: #555;
+        text-decoration: none;
+        padding: 6px 8px 6px 30px;
+        width: 250px;
+        position: relative;
+        cursor: pointer;
+      }
+
+      #menu a:hover {
+        color: #fff;
+        background: #3879D9;
+      }
+
+      #menu hr {
+        border: 1px solid #EBEBEB;
+        border-bottom: 0;
+      }
+    </style>
+  </head>
   <body>
-    <table>
-      ${tableRows}
-    </table>
-    <div style="color:white;">
-      <div id="here">hello</div>
+    
+    <div>
+      <div id="mermaidGraph">hello</div>
     </div>
+
+    <div id="menu">
+      <a id="open-call">
+        Open function call
+      </a>
+      <a id="open-func">
+          Open function definition
+      </a>
+      <hr />
+      <a id="add-brk-call">
+        Add breakpoint to function call
+      </a>
+      <a id="add-brk-func">
+        Add breakpoint to function definition
+      </a>
+    </div>
+
     <script>
       const vscode = acquireVsCodeApi();
       function openFile(filePath, lineno) {
-        console.log(document);
+        console.log("openfile", filePath, lineno);
         vscode.postMessage({ command: 'openFile', filePath, lineno});
       }
+      function addBreakpoint(filePath, lineno) {
+        console.log("breakpoint", filePath, lineno);
+        vscode.postMessage({ command: 'addBreakpoint', filePath, lineno});
+      }
     </script>
+
     <script>
+    
+    var i = document.getElementById("menu").style;
+    function menu(x, y) {
+        i.top = y + "px";
+        i.left = x + "px";
+        i.visibility = "visible";
+        i.opacity = "1";
+    }
+    function unmenu() {
+        i.opacity = "0";
+        setTimeout(function() {
+            i.visibility = "hidden";
+        }, 501);
+    }
+
     async function ads () {
       mermaid.initialize({ startOnLoad: false });
       const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "${graphString}");
       const nodeData = JSON.parse('${replaceAll(JSON.stringify(data.graph.nodes), '\\', '/')}');
       console.log(htmlCode);
       console.log(nodeData);
-      document.getElementById('here').innerHTML = htmlCode.svg;
+      document.getElementById('mermaidGraph').innerHTML = htmlCode.svg;
       const nodes = document.querySelectorAll('.node');
         nodes.forEach(node => {
             const textContent = node.textContent;
             const nn = nodeData.filter((x) => x.func_name == textContent)[0];
             console.log(textContent, node, nn);
-            node.onclick = () => {openFile(nn["file"], nn["lineno"])};
+            node.onclick = () => {openFile(nn.file, nn.lineno)};
             node.style.cursor = "pointer";
             if (nn.is_route && nn.is_route == true) {
               const rect = node.getElementsByTagName('rect')[0];
@@ -524,7 +596,45 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
                 node.style.cursor = "not-allowed";
               }
             }
+
+            // add context menu
+            node.addEventListener('contextmenu', function(e) {
+              // set menu links
+              console.log(nn);
+              var openCall = document.getElementById('open-call');
+              openCall.onclick = function(e) {
+                  e.preventDefault();
+                  console.log(nn.file, nn.lineno);
+              };
+              var openFunc = document.getElementById('open-func');
+              openFunc.onclick = function(e) {
+                  e.preventDefault();
+                  openFile(nn.file, nn.lineno);
+              };
+              var addBrkCall = document.getElementById('add-brk-call');
+              addBrkCall.onclick = function(e) {
+                  e.preventDefault();
+                  console.log(nn.file, nn.lineno);
+              };
+              var addBrkFunc = document.getElementById('add-brk-func');
+              addBrkFunc.onclick = function(e) {
+                  e.preventDefault();
+                  addBreakpoint(nn.file, nn.lineno);
+              };
+
+              // display menu
+              var posX = e.clientX;
+              var posY = e.clientY;
+              menu(posX, posY);
+              e.preventDefault();
+          }, false);
         });
+
+        // hide menu
+        document.addEventListener('click', function(e) {
+          i.opacity = "0";
+          i.visibility = "hidden";
+        }, false);
     }
       ads();
     </script>
