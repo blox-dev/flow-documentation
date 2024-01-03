@@ -42,7 +42,7 @@ class GraphMaker(ast.NodeVisitor):
                        break 
                 else:
                     # unvisited external node, create dummy with some info at least
-                    self.nodes.append({'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func"] , 'ast': None, 'id': self.max_id, 'is_route': True})
+                    self.nodes.append({'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func_name"] , 'ast': None, 'id': self.max_id, 'is_route': True})
                     self.graph.add((self.current_node, self.max_id))
                     self.max_id += 1
             else:

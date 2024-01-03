@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
@@ -35,6 +36,10 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand(
     "flow-documentation.createGraphs",
     () => {
+      // update flow webview
+      provider.fetchFlows();
+      
+      // create the graphs
       createGraph(context);
     }
   );
@@ -71,7 +76,7 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
     for (let i = 0 ; i < nextLines.length ; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches.routes.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.routes.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func_name: x[1]});
         break;
       }
     }
@@ -341,36 +346,36 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
     // const [endP, flows, funcs] = extractRFF();
     // // context.globalState.update("endPointMap", endPoints);
     // vscode.window.showInformationMessage(JSON.stringify(endPoints));
-    let flows: LooseObject[] | undefined = context.globalState.get("flows");
+    let allFlows: LooseObject[] | undefined = context.globalState.get("flows");
     let routes:  LooseObject[] | undefined = context.globalState.get("routes");
     let funcs: LooseObject[] | undefined =  context.globalState.get("funcs");
 
-    if (flows === undefined) {
+    if (allFlows === undefined) {
       throw new Error("how");
     }
 
-    let flow: LooseObject[] = [];
+    let flows: LooseObject[] = [];
 
     if (flowName !== undefined) {
-      let flow2 = flows.find((el) => el.name === flowName);
+      let flow = allFlows.find((el) => el.name === flowName);
 
-      if (flow2 === undefined) {
+      if (flow === undefined) {
         throw new Error("how");
       }
 
       // generate this graph
-      flow = [flow2];
+      flows = [flow];
     }
     else {
-      flow = flows;
       // generate all graphs
+      flows = allFlows;
     }
 
-    for(let i = 0 ; i< flow.length ; ++i) {
-      runPythonProg(flow[i], routes).then((result) => {
+    for(let i = 0 ; i< flows.length ; ++i) {
+      runPythonProg(flows[i], routes).then((result) => {
         if (result.errors.length) {
           result.errors.forEach(err => console.error(err));
-          vscode.window.showErrorMessage(`Graph generation for flow '${flow[i].name}' failed`);
+          vscode.window.showErrorMessage(`Graph generation for flow '${flows[i].name}' failed`);
           throw new Error();
         }
         if (result.outputs.length !== 1) {
@@ -385,7 +390,7 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           let unknownNode = false;
 
           if (node.is_route) {
-            const route = routes?.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func === node.func_name);
+            const route = routes?.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func_name === node.func_name);
             if (route?.length) {
               node.lineno = route[0].lineno;
               node.project_path = route[0].project_path;
@@ -415,7 +420,7 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           }
         }
 
-        showGraph(data, context.extensionPath, flow[i].name);
+        showGraph(data, context.extensionPath, flows[i].name);
       })
       .catch((error) => {
         vscode.window.showErrorMessage(`Graph generation failed`);
