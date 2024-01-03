@@ -14,14 +14,19 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "views": {
+			"explorer": [
+				{
+					"type": "webview",
+					"id": "flow-documentation.flowsView",
+					"name": "Flow Documentation"
+				}
+			]
+		},
     "commands": [
       {
-        "command": "flow-documentation.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "flow-documentation.countWords",
-        "title": "Count Words"
+        "command": "flow-documentation.createGraphs",
+        "title": "Create Graphs"
       }
     ],
     "configuration": {

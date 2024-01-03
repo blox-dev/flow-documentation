@@ -4,13 +4,48 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
+import { FlowsViewProvider } from "./webview";
+import {addBreakpoint, openFile, pathsAreEqual, replaceAll} from "./utils";
 // import * as zlib from 'zlib';
 
-interface LooseObject {
+export interface LooseObject {
   [key: string]: any
 }
 
-function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
+export function activate(context: vscode.ExtensionContext) {
+  // Use the console to output diagnostic information (console.log) and errors (console.error)
+  // This line of code will only be executed once when your extension is activated
+  console.log(
+    'Congratulations, your extension "flow-documentation" is now active!'
+  );
+
+  const provider = new FlowsViewProvider(context);
+  context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, provider));
+
+  console.log(context.globalState.get("routes"));
+  console.log(context.globalState.get("flows"));
+  console.log(context.globalState.get("funcs"));
+
+  // The command has been defined in the package.json file
+  // Now provide the implementation of the command with registerCommand
+  // The commandId parameter must match the command field in package.json
+  const disposable = vscode.commands.registerCommand(
+    "flow-documentation.createGraphs",
+    () => {
+      createGraph(context);
+    }
+  );
+
+  context.subscriptions.push(disposable);
+}
+
+// This method is called when your extension is deactivated
+export function deactivate() {}
+
+function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const content = fs.readFileSync(filePath, "utf8");
   const modName = path.basename(filePath, path.extname(filePath));
 
@@ -95,7 +130,7 @@ function extractWordCounts(filePath: string): Record<string, LooseObject[]> {
   return matches;
 }
 
-function countWordsInFolders(context: vscode.ExtensionContext) {
+export function extractRFF(context: vscode.ExtensionContext) {
   var monoRepos: string[] = vscode.workspace.workspaceFolders
     ? vscode.workspace.workspaceFolders.map((x) => x.uri.fsPath)
     : [];
@@ -137,10 +172,10 @@ function countWordsInFolders(context: vscode.ExtensionContext) {
       if (wordCounts[folderPathNorm]) {
         return;
       }
-      const subfolderCounts = countWordsInSubfolders(folderPath);
+      const subfolderCounts = extractPatternInSubfolders(folderPath);
 
       // Add project info to each function and funcs
-      let [projectRoutes, projectFlows, projectFuncs] = extractFlowsAndEnpoints(subfolderCounts);
+      let [projectRoutes, projectFlows, projectFuncs] = flattenRFF(subfolderCounts);
       
       if (!(projectRoutes.length || projectFlows.length || projectFuncs.length)) {
         // empty project
@@ -166,10 +201,13 @@ function countWordsInFolders(context: vscode.ExtensionContext) {
     //   return wordCounts[Object.keys(wordCounts)[0]];
     // }
   });
+  context.globalState.update("routes", routes);
+  context.globalState.update("flows", flows);
+  context.globalState.update("funcs", funcs);
   return [routes, flows, funcs];
 }
 
-function countWordsInSubfolders(folderPath: string): LooseObject {
+function extractPatternInSubfolders(folderPath: string): LooseObject {
   const files = fs.readdirSync(folderPath, { withFileTypes: true });
   const subfolderCounts: LooseObject = {};
 
@@ -181,13 +219,13 @@ function countWordsInSubfolders(folderPath: string): LooseObject {
       filePath.endsWith(".py") &&
       file.name.charAt(0) !== "."
     ) {
-      const counts = extractWordCounts(filePath);
+      const counts = extractPatterns(filePath);
       if(Object.keys(counts).length) {
         subfolderCounts[filePath] = counts;
       }
     } else if (file.isDirectory() && file.name.charAt(0) !== ".") {
       // Recursively search for Python files in subdirectories
-      const deeperCounts = countWordsInSubfolders(filePath);
+      const deeperCounts = extractPatternInSubfolders(filePath);
       if ( Object.keys(deeperCounts).length) {
         subfolderCounts[filePath] = deeperCounts;
       }
@@ -201,7 +239,7 @@ function countWordsInSubfolders(folderPath: string): LooseObject {
   return subfolderCounts;
 }
 
-function extractFlowsAndEnpoints(endPoints: LooseObject): [LooseObject[], LooseObject[], LooseObject[]] {
+function flattenRFF(endPoints: LooseObject): [LooseObject[], LooseObject[], LooseObject[]] {
   let routes: LooseObject[] = [];
   let flows: LooseObject[] = [];
   let funcs: LooseObject[] = [];
@@ -259,7 +297,7 @@ function customFlattenObject(obj: LooseObject, parentKey: string = ''): Record<s
   return flattened;
 }
 
-function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<string, string[]>> {
+function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined): Promise<Record<string, string[]>> {
   return new Promise((resolve, reject) => {
     const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
     const endP = JSON.stringify(endPoints);
@@ -270,6 +308,11 @@ function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<s
     // console.log(comp.length);
     var output: string[] = [];
     var errors: string[] = [];
+
+    if (endPoints === undefined) {
+      endPoints = [];
+    }
+
     // Run the Python script with the JSON argument
     const pythonProcess = child_process.spawn("python", [pythonScriptPath, flow.file, flow.func, endP]);
     // const pythonProcess = child_process.spawn("python", [pythonScriptPath]);
@@ -294,179 +337,131 @@ function runPythonProg(flow: LooseObject, endPoints: Object[]): Promise<Record<s
   });
 }
 
-function pathsAreEqual(path1: string, path2: string) {
-  path1 = path.resolve(path1);
-  path2 = path.resolve(path2);
-  if (process.platform === "win32") {
-    return path1.toLowerCase() === path2.toLowerCase();
-  }
-  return path1 === path2;
-}
+export function createGraph(context: vscode.ExtensionContext, flowName: string | undefined = undefined) {
+    // const [endP, flows, funcs] = extractRFF();
+    // // context.globalState.update("endPointMap", endPoints);
+    // vscode.window.showInformationMessage(JSON.stringify(endPoints));
+    let flows: LooseObject[] | undefined = context.globalState.get("flows");
+    let routes:  LooseObject[] | undefined = context.globalState.get("routes");
+    let funcs: LooseObject[] | undefined =  context.globalState.get("funcs");
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log(
-    'Congratulations, your extension "flow-documentation" is now active!'
-  );
-
-  var endPointMap = context.globalState.get("endPointMap") || [];
-  var graphs = context.globalState.get("graphs") || [];
-  console.log(endPointMap);
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
-  let disposable = vscode.commands.registerCommand(
-    "flow-documentation.helloWorld",
-    () => {
-      // The code you place here will be executed every time your command is executed
-      // Display a message box to the user
-      vscode.window.showInformationMessage("Hello VS Code");
+    if (flows === undefined) {
+      throw new Error("how");
     }
-  );
 
-  function showGraph(data: JSON) {
-    const panel = vscode.window.createWebviewPanel(
-      'graph',
-      'Workspace Graph',
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true
+    let flow: LooseObject[] = [];
+
+    if (flowName !== undefined) {
+      let flow2 = flows.find((el) => el.name === flowName);
+
+      if (flow2 === undefined) {
+        throw new Error("how");
       }
-    );
 
-    // Load an HTML file or generate HTML content with the graph here
-    panel.webview.html = getWebviewContent(panel, data, context);
+      // generate this graph
+      flow = [flow2];
+    }
+    else {
+      flow = flows;
+      // generate all graphs
+    }
 
-    //vscode.debug.addBreakpoints();
-    
-    // In your WebView
-    // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
-    // In your extension
-    panel.webview.onDidReceiveMessage((message) => {
-      if (message.command === 'openFile' && message.filePath) {
-          vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath)).then((document) => {
-            if (message.lineno) {
-              vscode.window.showTextDocument(document, {}).then((editor) => {
-                  var range = new vscode.Range(message.lineno, 0, message.lineno, 0);
-                  editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-              });
-            } else {
-              vscode.window.showTextDocument(document);
+    for(let i = 0 ; i< flow.length ; ++i) {
+      runPythonProg(flow[i], routes).then((result) => {
+        if (result.errors.length) {
+          result.errors.forEach(err => console.error(err));
+          vscode.window.showErrorMessage(`Graph generation for flow '${flow[i].name}' failed`);
+          throw new Error();
+        }
+        if (result.outputs.length !== 1) {
+          throw new Error("too much python output");
+        }
+        const data = JSON.parse(result.outputs[0]);
+        // match graph funcs with extracted funcs
+        for (let i = 0 ; i< data.graph.nodes.length ; i++) {
+          let node = data.graph.nodes[i];
+
+          // Node is a http call
+          let unknownNode = false;
+
+          if (node.is_route) {
+            const route = routes?.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func === node.func_name);
+            if (route?.length) {
+              node.lineno = route[0].lineno;
+              node.project_path = route[0].project_path;
+              node.project_color = route[0].project_color;
             }
-          });
-      } else if(message.command === 'addBreakpoint' && message.filePath && message.lineno) {
-        // TODO: no way to visually display to the user that there is a breakpoint in the actual file
-        // can show in the graph though, but that's about it. With no support for launching the
-        // functions from the graph, it's just confusing
-
-        // +1 because the lineno points at the function header, not the function code
-        const range = new vscode.Range(message.lineno + 1, 0, message.lineno + 1, 0);
-        const location = new vscode.Location(vscode.Uri.file(message.filePath), range);
-        const brk = new vscode.SourceBreakpoint(location);
-        vscode.debug.addBreakpoints([brk]);
-        null;
-      }
-    });
-  };
-
-  const disposable2 = vscode.commands.registerCommand(
-    "flow-documentation.countWords",
-    () => {
-      const [endP, flows, funcs] = countWordsInFolders(context);
-      for(let i = 0 ; i< flows.length ; ++i) {
-        runPythonProg(flows[i], endP).then((result) => {
-          if (result.errors.length) {
-            result.errors.forEach(err => console.error(err));
-            throw new Error();
-          }
-          if (result.outputs.length !== 1) {
-            throw new Error("too much python output");
-          }
-          const data = JSON.parse(result.outputs[0]);
-          // match graph funcs with extracted funcs
-          for (let i = 0 ; i< data.graph.nodes.length ; i++) {
-            let node = data.graph.nodes[i];
-
-            // Node is a http call
-            let unknownNode = false;
-
-            if (node.is_route) {
-              const route = endP.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func === node.func_name);
-              if (route.length) {
-                node.lineno = route[0].lineno;
-                node.project_path = route[0].project_path;
-                node.project_color = route[0].project_color;
-              }
-              else {
-                unknownNode = true;
-              }
-            }
-            // Node is a function call
             else {
-              const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
-              // TODO: remove if condition, dummy check
-              if (func.length) {
-                node.lineno = func[0].lineno;
-                node.project_path = func[0].project_path;
-                node.project_color = func[0].project_color;
-              }
-              else {
-                unknownNode = true;
-              }
-            }
-            if (unknownNode) {
-              node.lineno = 0;
-              node.project_path = "dummy";
-              node.project_color = "#ff0000"; // red
+              unknownNode = true;
             }
           }
+          // Node is a function call
+          else {
+            const func = funcs?.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
+            // TODO: remove if condition, dummy check
+            if (func?.length) {
+              node.lineno = func[0].lineno;
+              node.project_path = func[0].project_path;
+              node.project_color = func[0].project_color;
+            }
+            else {
+              unknownNode = true;
+            }
+          }
+          if (unknownNode) {
+            node.lineno = 0;
+            node.project_path = "dummy";
+            node.project_color = "#ff0000"; // red
+          }
+        }
 
-          showGraph(data);
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-        });
-      }
+        showGraph(data, context.extensionPath, flow[i].name);
+      })
+      .catch((error) => {
+        vscode.window.showErrorMessage(`Graph generation failed`);
+        console.error('Error:', error);
+      });
+    }
+}
 
-      // context.globalState.update("endPointMap", endPoints);
-      // vscode.window.showInformationMessage(JSON.stringify(endPoints));
+function showGraph(data: JSON, extensionPath: string, flowName: string) {
+  const panel = vscode.window.createWebviewPanel(
+    'graph',
+    `${flowName} Graph`,
+    vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true
     }
   );
 
-  context.subscriptions.push(disposable);
-  context.subscriptions.push(disposable2);
-}
+  // Load an HTML file or generate HTML content with the graph here
+  panel.webview.html = getWebviewContent(panel, data, extensionPath);
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
-
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-}
-
-function replaceAll(str: string, find: string, replace: string) {
-  return str.replace(new RegExp(escapeRegExp(find), 'g'), replace);
-}
-
-function vscodePath(pp: string) {
-  return replaceAll(path.normalize(pp), '\\', '/');
-}
+  //vscode.debug.addBreakpoints();
+  
+  // In your WebView
+  // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
+  // In your extension
+  panel.webview.onDidReceiveMessage((message) => {
+    if (message.command === 'openFile' && message.filePath) {
+      openFile(message.filePath, message.lineno);
+    } else if(message.command === 'addBreakpoint' && message.filePath && message.lineno) {
+      addBreakpoint(message);
+    }
+  });
+};
 
 // Inside the getWebviewContent function
-function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, context: vscode.ExtensionContext ) {
+function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extensionPath: string ) {
   const workspacePath = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : ''; // Assumes you have a workspace open
 
   if (!workspacePath) {
       return '<p>No workspace open.</p>';
   }
 
-  const mermaidPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'mermaid.min.js'));
-  const jqueryPath = vscode.Uri.file(path.join(context.extensionPath, 'lib', 'jquery.min.js'));
+  const mermaidPath = vscode.Uri.file(path.join(extensionPath, 'lib', 'mermaid.min.js'));
+  const jqueryPath = vscode.Uri.file(path.join(extensionPath, 'lib', 'jquery.min.js'));
 
   let graph: String[] = ["graph TD"];
   for (let i = 0 ; i < data.graph.edges.length; ++i) {
@@ -474,8 +469,6 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, contex
     graph.push(`${data.graph.nodes[startId]['func_name']} --> ${data.graph.nodes[endId]['func_name']}`);
   }
   let graphString: String = graph.join('\\n');
-  // const mermaidSrc = panel.webview.asWebviewUri(mermaidPath);
-
 
   let xd = `<!DOCTYPE html>
 <html>
