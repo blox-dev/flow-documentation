@@ -27,9 +27,9 @@
         vscode.postMessage({ command: 'openFile', filePath, lineno});
     }
 
-    function createGraph(flowName) {
-        console.log("createGraph", flowName);
-        vscode.postMessage({ command: 'createGraph', flowName});
+    function createGraph(flowName, refresh = false) {
+        console.log("createGraph", flowName, refresh);
+        vscode.postMessage({ command: 'createGraph', flowName, refresh});
     }
 
     function escapeRegExp(string) {
@@ -65,12 +65,20 @@
 
             let cg = document.createElement("a");
             cg.innerText = "Create graph";
+            cg.style.paddingRight = '10px';
             cg.title = flowName;
             cg.href = "#";
-            cg.addEventListener('click', () => createGraph(flowName));
+            cg.addEventListener('click', () => createGraph(flowName, false));
+
+            let rg = document.createElement("a");
+            rg.innerText = "Refresh graph";
+            rg.title = flowName;
+            rg.href = "#";
+            rg.addEventListener('click', () => createGraph(flowName, true));
 
             td.appendChild(a);
             td.appendChild(cg);
+            td.appendChild(rg);
 
             tr.appendChild(td);
             table.appendChild(tr);

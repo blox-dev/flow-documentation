@@ -48,7 +48,7 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 					}
 				case 'createGraph':
 					{
-						createGraph(this._context, data.flowName);
+						createGraph(this._context, data.flowName, data.refresh);
 						break;
 					}
 			}

@@ -29,6 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log(context.globalState.get("routes"));
   console.log(context.globalState.get("flows"));
   console.log(context.globalState.get("funcs"));
+  console.log(context.globalState.get("graphs"));
 
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
@@ -60,15 +61,11 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
 
   var match;
-  var matches: Record<string, LooseObject[]> = {};
+  var matches: Record<string, LooseObject[]> = {routes: [], funcs: [], flowStart: [], flowEnd: []};
   
 
   // match routes
   while ((match = routePattern.exec(content))) {
-    if(matches.routes === undefined) {
-      matches.routes = [];
-    }
-
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
@@ -84,10 +81,6 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
 
   // match user defined functions
   while ((match = funcPattern.exec(content))) {
-    if(matches.funcs === undefined) {
-      matches.funcs = [];
-    }
-
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
@@ -96,10 +89,6 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
 
   // match flow-start(<flow-name>)
   while ((match = flowStartPattern.exec(content))) {
-    if(matches.flowStart === undefined) {
-      matches.flowStart = [];
-    }
-
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
@@ -115,10 +104,6 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
 
   // match flow-end(<flow-name>)
   while ((match = flowEndPattern.exec(content))) {
-    if(matches.flowEnd === undefined) {
-      matches.flowEnd = [];
-    }
-
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
@@ -314,9 +299,7 @@ function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined):
     var output: string[] = [];
     var errors: string[] = [];
 
-    if (endPoints === undefined) {
-      endPoints = [];
-    }
+    endPoints = endPoints || [];
 
     // Run the Python script with the JSON argument
     const pythonProcess = child_process.spawn("python", [pythonScriptPath, flow.file, flow.func, endP]);
@@ -342,15 +325,20 @@ function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined):
   });
 }
 
-export function createGraph(context: vscode.ExtensionContext, flowName: string | undefined = undefined) {
+export function createGraph(context: vscode.ExtensionContext, flowName: string | undefined = undefined, refresh: boolean = false) {
     // const [endP, flows, funcs] = extractRFF();
     // // context.globalState.update("endPointMap", endPoints);
     // vscode.window.showInformationMessage(JSON.stringify(endPoints));
-    let allFlows: LooseObject[] | undefined = context.globalState.get("flows");
-    let routes:  LooseObject[] | undefined = context.globalState.get("routes");
-    let funcs: LooseObject[] | undefined =  context.globalState.get("funcs");
+    let allFlows: LooseObject[] = context.globalState.get("flows") || [];
+    let routes:  LooseObject[] = context.globalState.get("routes") || [];
+    let funcs: LooseObject[] = context.globalState.get("funcs") || [];
+    let graphs: LooseObject = context.globalState.get("graphs") || {};
 
-    if (allFlows === undefined) {
+    if (refresh) {
+      [routes, allFlows, funcs] = extractRFF(context);
+    }
+
+    if (allFlows.length === 0) {
       throw new Error("how");
     }
 
@@ -372,10 +360,19 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
     }
 
     for(let i = 0 ; i< flows.length ; ++i) {
+      const flowName = flows[i].name;
+
+      // check if graph is in memory
+      if (!refresh && graphs[flowName]) {
+        const data = graphs[flowName];
+        showGraph(data, context.extensionPath, flowName);
+        continue;
+      }
+      
       runPythonProg(flows[i], routes).then((result) => {
         if (result.errors.length) {
           result.errors.forEach(err => console.error(err));
-          vscode.window.showErrorMessage(`Graph generation for flow '${flows[i].name}' failed`);
+          vscode.window.showErrorMessage(`Graph generation for flow '${flowName}' failed`);
           throw new Error();
         }
         if (result.outputs.length !== 1) {
@@ -420,7 +417,12 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           }
         }
 
-        showGraph(data, context.extensionPath, flows[i].name);
+        if (refresh || !graphs[flowName]) {
+          graphs[flowName] = data;
+          context.globalState.update("graphs", graphs);
+        }
+
+        showGraph(data, context.extensionPath, flowName);
       })
       .catch((error) => {
         vscode.window.showErrorMessage(`Graph generation failed`);
@@ -475,6 +477,21 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
   }
   let graphString: String = graph.join('\\n');
 
+  let legend = new Map();
+  data.graph.nodes.forEach((element: LooseObject) => {
+    const x = element.project_path.split("\\");
+    legend.set(element.project_color, x[x.length - 1]);
+  });
+
+  let legendHtml = [];
+  for (let [color, proj_name] of legend.entries()) {
+    if (proj_name === "dummy") {
+      proj_name = "External API call";
+    }
+    legendHtml.push(`<div class="legend-item"><span class="color-box" style="background-color: ${color};"></span> ${proj_name}</div>`);
+  }
+  let legendString = legendHtml.join('');
+
   let xd = `<!DOCTYPE html>
 <html>
     <head>
@@ -518,12 +535,41 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
         border: 1px solid #EBEBEB;
         border-bottom: 0;
       }
+
+      .legend {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+  
+      .legend-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+  
+      .legend-item {
+        margin-bottom: 5px;
+      }
+  
+      .color-box {
+        display: inline-block;
+        width: 15px;
+        height: 15px;
+        margin-right: 5px;
+        border: 1px solid #000; /* Add a border for better visibility */
+      }
     </style>
   </head>
   <body>
     
-    <div>
-      <div id="mermaidGraph">hello</div>
+    <div style="display:flex; flex-direction:row;">
+      <div id="mermaidGraph">
+        hello
+      </div>
+
+      <div class="legend">
+        <div class="legend-title">Projects</div>
+        ${legendString}
+      </div>
     </div>
 
     <div id="menu">
@@ -595,6 +641,9 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
               }
             }
 
+            if (nn.project_color && nn.project_color === "#ff0000") {
+              return;
+            }
             // add context menu
             node.addEventListener('contextmenu', function(e) {
               // set menu links
