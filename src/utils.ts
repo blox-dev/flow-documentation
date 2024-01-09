@@ -22,8 +22,12 @@ export function openFile(filePath: string, lineno: number | undefined) {
     vscode.workspace.openTextDocument(vscode.Uri.file(filePath)).then((document) => {
         if (lineno) {
           vscode.window.showTextDocument(document, {}).then((editor) => {
-              var range = new vscode.Range(lineno, 0, lineno, 0);
+              const range = new vscode.Range(lineno, 0, lineno, 0);
+              const startPosition = new vscode.Position(lineno - 1, 0); // Line numbers start from 0
+              const endPosition = new vscode.Position(lineno, 0);
+              
               editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+              editor.selections = [new vscode.Selection(startPosition, endPosition)];
           });
         } else {
           vscode.window.showTextDocument(document);
@@ -36,8 +40,7 @@ export function addBreakpoint(message: any) {
     // can show in the graph though, but that's about it. With no support for launching the
     // functions from the graph, it's just confusing
 
-    // +1 because the lineno points at the function header, not the function code
-    const range = new vscode.Range(message.lineno + 1, 0, message.lineno + 1, 0);
+    const range = new vscode.Range(message.lineno, 0, message.lineno, 0);
     const location = new vscode.Location(vscode.Uri.file(message.filePath), range);
     const brk = new vscode.SourceBreakpoint(location);
     vscode.debug.addBreakpoints([brk]);

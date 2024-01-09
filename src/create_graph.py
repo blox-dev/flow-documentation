@@ -1,4 +1,5 @@
 import ast
+from collections import defaultdict
 
 def is_same_function(f1, f2):
     return f1["module"] == f2["module"] and f1["func_name"] == f2["func_name"]
@@ -14,7 +15,7 @@ class GraphMaker(ast.NodeVisitor):
         self.nodes = nodes
         self.current_node = start_id
         # set of edges
-        self.graph = set()
+        self.graph = defaultdict(list) # {(start_id, end_id): [call_lineno]}
         self.max_id = max_id
         self.visited_nodes = set()
 
@@ -38,24 +39,24 @@ class GraphMaker(ast.NodeVisitor):
             if hasattr(node, 'route') and node.route:
                 for n in self.nodes:
                     if is_same_node(node.route, n):
-                       self.graph.add((self.current_node, n['id']))
+                       self.graph[(self.current_node, n['id'])].append(node.lineno)
                        break 
                 else:
                     # unvisited external node, create dummy with some info at least
                     self.nodes.append({'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func_name"] , 'ast': None, 'id': self.max_id, 'is_route': True})
-                    self.graph.add((self.current_node, self.max_id))
+                    self.graph[(self.current_node, self.max_id)].append(node.lineno)
                     self.max_id += 1
             else:
                 # the route is unknown / external
                 self.nodes.append({'module': 'dummy', 'file': 'dummy', 'func_name': self._get_attribute_chain(node.func) , 'ast': None, 'id': self.max_id, 'is_route': True})
-                self.graph.add((self.current_node, self.max_id))
+                self.graph[(self.current_node, self.max_id)].append(node.lineno)
                 self.max_id += 1
             return
         if isinstance(node.func, ast.Name):
             # Handle simple function calls like "foo()"
             for n in self.nodes:
                 if node.func.id == n["func_name"]:
-                    self.graph.add((self.current_node, n['id']))
+                    self.graph[(self.current_node, n['id'])].append(node.lineno)
                     # avoid recursion, but still append it to the graph
                     if n['id'] not in self.visited_nodes:
                         self.visited_nodes.add(n['id'])
@@ -74,7 +75,7 @@ class GraphMaker(ast.NodeVisitor):
                 if y.startswith(n['module']):
                     func_name = y[len(n['module'])+1:]
                     if n['func_name'].endswith(func_name):
-                        self.graph.add((self.current_node, n['id']))
+                        self.graph[(self.current_node, n['id'])].append(node.lineno)
                         old_node = self.current_node
                         self.current_node = n['id']
                         self.visit(n["ast"])
@@ -105,4 +106,4 @@ def create_graph(module, target_func, asts):
     # graph = ["graph TD"]
     # for (start_id, end_id) in gm.graph:
     #     graph.append(f"{asts2[start_id]['func_name']} --> {asts2[end_id]['func_name']}")
-    return {'nodes': [{k:v for k,v in ast.items() if k != 'ast'} for ast in asts], 'edges': list(map(list,gm.graph))}
+    return {'nodes': [{k:v for k,v in ast.items() if k != 'ast'} for ast in asts], 'edges': [[k[0], k[1], v] for (k, v) in gm.graph.items()]}

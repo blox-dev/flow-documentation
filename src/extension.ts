@@ -194,6 +194,16 @@ export function extractRFF(context: vscode.ExtensionContext) {
   context.globalState.update("routes", routes);
   context.globalState.update("flows", flows);
   context.globalState.update("funcs", funcs);
+
+  let tmp = new Set();
+  flows.forEach((f) => {
+    if (tmp.has(f.name)) {
+      vscode.window.showWarningMessage(`Duplicate flow '${f.name}' might cause issues. Consider making flow names unique.`);
+      return;
+    }
+    tmp.add(f.name);
+  });
+
   return [routes, flows, funcs];
 }
 
@@ -444,8 +454,6 @@ function showGraph(data: JSON, extensionPath: string, flowName: string) {
 
   // Load an HTML file or generate HTML content with the graph here
   panel.webview.html = getWebviewContent(panel, data, extensionPath);
-
-  //vscode.debug.addBreakpoints();
   
   // In your WebView
   // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
@@ -472,8 +480,8 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
 
   let graph: String[] = ["graph TD"];
   for (let i = 0 ; i < data.graph.edges.length; ++i) {
-    const [startId, endId] = data.graph.edges[i];
-    graph.push(`${data.graph.nodes[startId]['func_name']} --> ${data.graph.nodes[endId]['func_name']}`);
+    const [startId, endId, _call_lineno] = data.graph.edges[i];
+    graph.push(`${data.graph.nodes[startId]['func_name']} ==> ${data.graph.nodes[endId]['func_name']}`);
   }
   let graphString: String = graph.join('\\n');
 
@@ -579,7 +587,6 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
       <a id="open-func">
           Open function definition
       </a>
-      <hr />
       <a id="add-brk-call">
         Add breakpoint to function call
       </a>
@@ -619,69 +626,115 @@ function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extens
     async function ads () {
       mermaid.initialize({ startOnLoad: false });
       const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "${graphString}");
-      const nodeData = JSON.parse('${replaceAll(JSON.stringify(data.graph.nodes), '\\', '/')}');
-      console.log(htmlCode);
-      console.log(nodeData);
+      const graphData = JSON.parse('${replaceAll(JSON.stringify(data.graph), '\\', '/')}');
+      const nodeData = graphData.nodes;
+      const edgeData = graphData.edges;
+      console.log(graphData);
       document.getElementById('mermaidGraph').innerHTML = htmlCode.svg;
       const nodes = document.querySelectorAll('.node');
-        nodes.forEach(node => {
-            const textContent = node.textContent;
-            const nn = nodeData.filter((x) => x.func_name == textContent)[0];
-            console.log(textContent, node, nn);
-            node.onclick = () => {openFile(nn.file, nn.lineno)};
-            node.style.cursor = "pointer";
-            if (nn.is_route && nn.is_route == true) {
-              const rect = node.getElementsByTagName('rect')[0];
-              console.log(rect);
-              console.log(nn);
-              rect.style.fill = nn.project_color;
-              rect.style.stroke = nn.project_color;
-              if (nn.project_color === '#ff0000') {
-                node.style.cursor = "not-allowed";
-              }
+      nodes.forEach(node => {
+          const textContent = node.textContent;
+          const nn = nodeData.filter((x) => x.func_name == textContent)[0];
+          node.onclick = () => {openFile(nn.file, nn.lineno)};
+          node.style.cursor = "pointer";
+          if (nn.is_route && nn.is_route == true) {
+            const rect = node.getElementsByTagName('rect')[0];
+            rect.style.fill = nn.project_color;
+            rect.style.stroke = nn.project_color;
+            if (nn.project_color === '#ff0000') {
+              node.style.cursor = "not-allowed";
             }
+          }
 
-            if (nn.project_color && nn.project_color === "#ff0000") {
-              return;
-            }
-            // add context menu
-            node.addEventListener('contextmenu', function(e) {
-              // set menu links
-              console.log(nn);
-              var openCall = document.getElementById('open-call');
-              openCall.onclick = function(e) {
-                  e.preventDefault();
-                  console.log(nn.file, nn.lineno);
-              };
-              var openFunc = document.getElementById('open-func');
-              openFunc.onclick = function(e) {
-                  e.preventDefault();
-                  openFile(nn.file, nn.lineno);
-              };
-              var addBrkCall = document.getElementById('add-brk-call');
-              addBrkCall.onclick = function(e) {
-                  e.preventDefault();
-                  console.log(nn.file, nn.lineno);
-              };
-              var addBrkFunc = document.getElementById('add-brk-func');
-              addBrkFunc.onclick = function(e) {
-                  e.preventDefault();
-                  addBreakpoint(nn.file, nn.lineno);
-              };
+          if (nn.project_color && nn.project_color === "#ff0000") {
+            return;
+          }
+          // add context menu
+          node.addEventListener('contextmenu', function(e) {
+            // set menu links
+            var openCall = document.getElementById('open-call');
+            openCall.style.display = 'none';
+            openCall.onclick = null;
 
-              // display menu
-              var posX = e.clientX;
-              var posY = e.clientY;
-              menu(posX, posY);
-              e.preventDefault();
+            var openFunc = document.getElementById('open-func');
+            openFunc.style.display = 'block';
+            openFunc.onclick = function(e) {
+                e.preventDefault();
+                openFile(nn.file, nn.lineno);
+            };
+
+            var addBrkCall = document.getElementById('add-brk-call');
+            addBrkCall.style.display = 'none';
+            addBrkCall.onclick = null;
+
+            var addBrkFunc = document.getElementById('add-brk-func');
+            addBrkFunc.style.display = 'block';
+            addBrkFunc.onclick = function(e) {
+                e.preventDefault();
+                // +1 because the lineno points at the function header, not the function code
+                addBreakpoint(nn.file, nn.lineno + 1);
+            };
+
+            // display menu
+            var posX = e.clientX;
+            var posY = e.clientY;
+            menu(posX, posY);
+            e.preventDefault();
           }, false);
-        });
+      });
+      console.log("----------- edges ------------");
+      console.log(edgeData);
+      const edges = document.querySelectorAll('.flowchart-link');
+      edges.forEach(edge => {
+        // reverse engineer node ids from edge name
+        // TODO: find some other method
+        const id = edge.id;
+        console.log(id);
 
-        // hide menu
-        document.addEventListener('click', function(e) {
-          i.opacity = "0";
-          i.visibility = "hidden";
+        [_L, start_node_name, end_node_name, _EdgeNum] = id.split('-');
+
+        const sn = nodeData.filter((x) => x.func_name == start_node_name)[0];
+        const en = nodeData.filter((x) => x.func_name == end_node_name)[0];
+
+        const call_lines = edgeData.filter((x) => x[0] == sn.id && x[1] == en.id)[0][2];
+        
+        // add context menu
+        edge.addEventListener('contextmenu', function(e) {
+          // set menu links
+          var openCall = document.getElementById('open-call');
+          openCall.style.display = 'block';
+          openCall.onclick = function(e) {
+              e.preventDefault();
+              openFile(sn.file, call_lines[0] - 1);
+          };
+
+          var openFunc = document.getElementById('open-func');
+          openFunc.style.display = 'none';
+          openFunc.onclick = null;
+
+          var addBrkCall = document.getElementById('add-brk-call');
+          addBrkCall.style.display = 'block';
+          addBrkCall.onclick = function(e) {
+              e.preventDefault();
+              addBreakpoint(sn.file, call_lines[0] - 1);
+          };
+
+          var addBrkFunc = document.getElementById('add-brk-func');
+          addBrkFunc.style.display = 'none';
+          addBrkFunc.onclick = null;
+
+          // display menu
+          var posX = e.clientX;
+          var posY = e.clientY;
+          menu(posX, posY);
+          e.preventDefault();
         }, false);
+      });
+      // hide menu
+      document.addEventListener('click', function(e) {
+        i.opacity = "0";
+        i.visibility = "hidden";
+      }, false);
     }
       ads();
     </script>
