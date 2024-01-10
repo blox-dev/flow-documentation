@@ -39,6 +39,7 @@ export function addBreakpoint(message: any) {
     // TODO: no way to visually display to the user that there is a breakpoint in the actual file
     // can show in the graph though, but that's about it. With no support for launching the
     // functions from the graph, it's just confusing
+    // Related: https://github.com/microsoft/vscode/issues/15178
 
     const range = new vscode.Range(message.lineno, 0, message.lineno, 0);
     const location = new vscode.Location(vscode.Uri.file(message.filePath), range);

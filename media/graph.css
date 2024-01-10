@@ -1,0 +1,59 @@
+#menu {
+  position: fixed;
+  z-index: 9999; /* Most times is 2000 used as middle */
+  visibility: hidden;
+  opacity: 0;
+
+  padding: 0px;
+  font-family: sans-serif;
+  font-size: 11px;
+  background: #fff;
+  color: #555;
+  border: 1px solid #c6c6c6;
+
+  -webkit-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+  -moz-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+  box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
+}
+
+#menu a {
+  display: block;
+  color: #555;
+  text-decoration: none;
+  padding: 6px 8px 6px 30px;
+  width: 250px;
+  position: relative;
+  cursor: pointer;
+}
+
+#menu a:hover {
+  color: #fff;
+  background: #3879d9;
+}
+
+#menu hr {
+  border: 1px solid #ebebeb;
+  border-bottom: 0;
+}
+
+.legend {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.legend-item {
+  margin-bottom: 5px;
+}
+
+.color-box {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
+  border: 1px solid #000; /* Add a border for better visibility */
+}

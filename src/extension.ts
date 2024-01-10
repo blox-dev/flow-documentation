@@ -7,6 +7,7 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { FlowsViewProvider } from "./webview";
 import {addBreakpoint, openFile, pathsAreEqual, replaceAll} from "./utils";
+import { GraphView } from "./graphview";
 // import * as zlib from 'zlib';
 
 export interface LooseObject {
@@ -316,7 +317,7 @@ function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined):
     // const pythonProcess = child_process.spawn("python", [pythonScriptPath]);
     
     pythonProcess.stdout.on("data", (data: any) => {
-      console.log(data);
+      console.log(data.toString());
       output.push(data);
     });
 
@@ -369,13 +370,15 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
       flows = allFlows;
     }
 
+    const graphView = new GraphView(context);
+
     for(let i = 0 ; i< flows.length ; ++i) {
       const flowName = flows[i].name;
 
       // check if graph is in memory
       if (!refresh && graphs[flowName]) {
         const data = graphs[flowName];
-        showGraph(data, context.extensionPath, flowName);
+        graphView.showGraph(data, flowName);
         continue;
       }
       
@@ -397,8 +400,8 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           let unknownNode = false;
 
           if (node.is_route) {
-            const route = routes?.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func_name === node.func_name);
-            if (route?.length) {
+            const route = routes.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func_name === node.func_name);
+            if (route.length) {
               node.lineno = route[0].lineno;
               node.project_path = route[0].project_path;
               node.project_color = route[0].project_color;
@@ -409,9 +412,9 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           }
           // Node is a function call
           else {
-            const func = funcs?.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
+            const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
             // TODO: remove if condition, dummy check
-            if (func?.length) {
+            if (func.length) {
               node.lineno = func[0].lineno;
               node.project_path = func[0].project_path;
               node.project_color = func[0].project_color;
@@ -431,314 +434,11 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
           graphs[flowName] = data;
           context.globalState.update("graphs", graphs);
         }
-
-        showGraph(data, context.extensionPath, flowName);
+        graphView.showGraph(data, flowName);
       })
       .catch((error) => {
         vscode.window.showErrorMessage(`Graph generation failed`);
         console.error('Error:', error);
       });
     }
-}
-
-function showGraph(data: JSON, extensionPath: string, flowName: string) {
-  const panel = vscode.window.createWebviewPanel(
-    'graph',
-    `${flowName} Graph`,
-    vscode.ViewColumn.One,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true
-    }
-  );
-
-  // Load an HTML file or generate HTML content with the graph here
-  panel.webview.html = getWebviewContent(panel, data, extensionPath);
-  
-  // In your WebView
-  // panel.webview.postMessage({ command: 'openFile', filePath: 'path/to/your/file' });
-  // In your extension
-  panel.webview.onDidReceiveMessage((message) => {
-    if (message.command === 'openFile' && message.filePath) {
-      openFile(message.filePath, message.lineno);
-    } else if(message.command === 'addBreakpoint' && message.filePath && message.lineno) {
-      addBreakpoint(message);
-    }
-  });
-};
-
-// Inside the getWebviewContent function
-function getWebviewContent(panel: vscode.WebviewPanel, data: LooseObject, extensionPath: string ) {
-  const workspacePath = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : ''; // Assumes you have a workspace open
-
-  if (!workspacePath) {
-      return '<p>No workspace open.</p>';
-  }
-
-  const mermaidPath = vscode.Uri.file(path.join(extensionPath, 'lib', 'mermaid.min.js'));
-  const jqueryPath = vscode.Uri.file(path.join(extensionPath, 'lib', 'jquery.min.js'));
-
-  let graph: String[] = ["graph TD"];
-  for (let i = 0 ; i < data.graph.edges.length; ++i) {
-    const [startId, endId, _call_lineno] = data.graph.edges[i];
-    graph.push(`${data.graph.nodes[startId]['func_name']} ==> ${data.graph.nodes[endId]['func_name']}`);
-  }
-  let graphString: String = graph.join('\\n');
-
-  let legend = new Map();
-  data.graph.nodes.forEach((element: LooseObject) => {
-    const x = element.project_path.split("\\");
-    legend.set(element.project_color, x[x.length - 1]);
-  });
-
-  let legendHtml = [];
-  for (let [color, proj_name] of legend.entries()) {
-    if (proj_name === "dummy") {
-      proj_name = "External API call";
-    }
-    legendHtml.push(`<div class="legend-item"><span class="color-box" style="background-color: ${color};"></span> ${proj_name}</div>`);
-  }
-  let legendString = legendHtml.join('');
-
-  let xd = `<!DOCTYPE html>
-<html>
-    <head>
-      <script src="${panel.webview.asWebviewUri(mermaidPath)}"></script>
-      <script src="${panel.webview.asWebviewUri(jqueryPath)}"></script>
-      <style>
-      #menu {
-        position: fixed;
-        z-index: 9999; /* Most times is 2000 used as middle */
-        visibility: hidden;
-        opacity: 0;
-
-        padding: 0px;
-        font-family: sans-serif;
-        font-size: 11px;
-        background: #fff;
-        color: #555;
-        border: 1px solid #C6C6C6;
-
-        -webkit-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
-        -moz-box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
-        box-shadow: 2px 2px 2px 0px rgba(143, 144, 145, 1);
-      }
-
-      #menu a {
-        display: block;
-        color: #555;
-        text-decoration: none;
-        padding: 6px 8px 6px 30px;
-        width: 250px;
-        position: relative;
-        cursor: pointer;
-      }
-
-      #menu a:hover {
-        color: #fff;
-        background: #3879D9;
-      }
-
-      #menu hr {
-        border: 1px solid #EBEBEB;
-        border-bottom: 0;
-      }
-
-      .legend {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-      }
-  
-      .legend-title {
-        font-weight: bold;
-        margin-bottom: 5px;
-      }
-  
-      .legend-item {
-        margin-bottom: 5px;
-      }
-  
-      .color-box {
-        display: inline-block;
-        width: 15px;
-        height: 15px;
-        margin-right: 5px;
-        border: 1px solid #000; /* Add a border for better visibility */
-      }
-    </style>
-  </head>
-  <body>
-    
-    <div style="display:flex; flex-direction:row;">
-      <div id="mermaidGraph">
-        hello
-      </div>
-
-      <div class="legend">
-        <div class="legend-title">Projects</div>
-        ${legendString}
-      </div>
-    </div>
-
-    <div id="menu">
-      <a id="open-call">
-        Open function call
-      </a>
-      <a id="open-func">
-          Open function definition
-      </a>
-      <a id="add-brk-call">
-        Add breakpoint to function call
-      </a>
-      <a id="add-brk-func">
-        Add breakpoint to function definition
-      </a>
-    </div>
-
-    <script>
-      const vscode = acquireVsCodeApi();
-      function openFile(filePath, lineno) {
-        console.log("openfile", filePath, lineno);
-        vscode.postMessage({ command: 'openFile', filePath, lineno});
-      }
-      function addBreakpoint(filePath, lineno) {
-        console.log("breakpoint", filePath, lineno);
-        vscode.postMessage({ command: 'addBreakpoint', filePath, lineno});
-      }
-    </script>
-
-    <script>
-    
-    var i = document.getElementById("menu").style;
-    function menu(x, y) {
-        i.top = y + "px";
-        i.left = x + "px";
-        i.visibility = "visible";
-        i.opacity = "1";
-    }
-    function unmenu() {
-        i.opacity = "0";
-        setTimeout(function() {
-            i.visibility = "hidden";
-        }, 501);
-    }
-
-    async function ads () {
-      mermaid.initialize({ startOnLoad: false });
-      const htmlCode = await mermaid.mermaidAPI.render('mermaidChart', "${graphString}");
-      const graphData = JSON.parse('${replaceAll(JSON.stringify(data.graph), '\\', '/')}');
-      const nodeData = graphData.nodes;
-      const edgeData = graphData.edges;
-      console.log(graphData);
-      document.getElementById('mermaidGraph').innerHTML = htmlCode.svg;
-      const nodes = document.querySelectorAll('.node');
-      nodes.forEach(node => {
-          const textContent = node.textContent;
-          const nn = nodeData.filter((x) => x.func_name == textContent)[0];
-          node.onclick = () => {openFile(nn.file, nn.lineno)};
-          node.style.cursor = "pointer";
-          if (nn.is_route && nn.is_route == true) {
-            const rect = node.getElementsByTagName('rect')[0];
-            rect.style.fill = nn.project_color;
-            rect.style.stroke = nn.project_color;
-            if (nn.project_color === '#ff0000') {
-              node.style.cursor = "not-allowed";
-            }
-          }
-
-          if (nn.project_color && nn.project_color === "#ff0000") {
-            return;
-          }
-          // add context menu
-          node.addEventListener('contextmenu', function(e) {
-            // set menu links
-            var openCall = document.getElementById('open-call');
-            openCall.style.display = 'none';
-            openCall.onclick = null;
-
-            var openFunc = document.getElementById('open-func');
-            openFunc.style.display = 'block';
-            openFunc.onclick = function(e) {
-                e.preventDefault();
-                openFile(nn.file, nn.lineno);
-            };
-
-            var addBrkCall = document.getElementById('add-brk-call');
-            addBrkCall.style.display = 'none';
-            addBrkCall.onclick = null;
-
-            var addBrkFunc = document.getElementById('add-brk-func');
-            addBrkFunc.style.display = 'block';
-            addBrkFunc.onclick = function(e) {
-                e.preventDefault();
-                // +1 because the lineno points at the function header, not the function code
-                addBreakpoint(nn.file, nn.lineno + 1);
-            };
-
-            // display menu
-            var posX = e.clientX;
-            var posY = e.clientY;
-            menu(posX, posY);
-            e.preventDefault();
-          }, false);
-      });
-      console.log("----------- edges ------------");
-      console.log(edgeData);
-      const edges = document.querySelectorAll('.flowchart-link');
-      edges.forEach(edge => {
-        // reverse engineer node ids from edge name
-        // TODO: find some other method
-        const id = edge.id;
-        console.log(id);
-
-        [_L, start_node_name, end_node_name, _EdgeNum] = id.split('-');
-
-        const sn = nodeData.filter((x) => x.func_name == start_node_name)[0];
-        const en = nodeData.filter((x) => x.func_name == end_node_name)[0];
-
-        const call_lines = edgeData.filter((x) => x[0] == sn.id && x[1] == en.id)[0][2];
-        
-        // add context menu
-        edge.addEventListener('contextmenu', function(e) {
-          // set menu links
-          var openCall = document.getElementById('open-call');
-          openCall.style.display = 'block';
-          openCall.onclick = function(e) {
-              e.preventDefault();
-              openFile(sn.file, call_lines[0] - 1);
-          };
-
-          var openFunc = document.getElementById('open-func');
-          openFunc.style.display = 'none';
-          openFunc.onclick = null;
-
-          var addBrkCall = document.getElementById('add-brk-call');
-          addBrkCall.style.display = 'block';
-          addBrkCall.onclick = function(e) {
-              e.preventDefault();
-              addBreakpoint(sn.file, call_lines[0] - 1);
-          };
-
-          var addBrkFunc = document.getElementById('add-brk-func');
-          addBrkFunc.style.display = 'none';
-          addBrkFunc.onclick = null;
-
-          // display menu
-          var posX = e.clientX;
-          var posY = e.clientY;
-          menu(posX, posY);
-          e.preventDefault();
-        }, false);
-      });
-      // hide menu
-      document.addEventListener('click', function(e) {
-        i.opacity = "0";
-        i.visibility = "hidden";
-      }, false);
-    }
-      ads();
-    </script>
-  </body>
-</html>`;
-  return xd;
 }
