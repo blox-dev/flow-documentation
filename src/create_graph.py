@@ -17,7 +17,7 @@ class GraphMaker(ast.NodeVisitor):
         # set of edges
         self.graph = defaultdict(list) # {(start_id, end_id): [call_lineno]}
         self.max_id = max_id
-        self.visited_nodes = set()
+        self.visited_nodes = set([start_id])
 
     def _get_attribute_chain(self, node):
         if isinstance(node, ast.Name):

@@ -81,7 +81,7 @@ export class GraphView {
           break;
         }
         case "addBreakpoint": {
-          addBreakpoint(data);
+          addBreakpoint(message);
           break;
         }
         case "removeBreakpoint": {
