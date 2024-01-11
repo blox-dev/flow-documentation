@@ -144,7 +144,10 @@ export function extractRFF(context: vscode.ExtensionContext) {
   monoRepos.forEach((monoRepo) => {
     // IMPORTANT: assumes monolithic architecture of the repository (folder),
     // where each subfolder represents a different project
-    const files = fs.readdirSync(monoRepo, { withFileTypes: true });
+
+    // TODO: make a list of ignored files or folders or something like that
+    // instead of always ignoring folders starting with .
+    const files = fs.readdirSync(monoRepo, { withFileTypes: true }).filter(dirent => !dirent.name.startsWith('.'));
     const folders = files.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
     if (files.length > folders.length) {
     vscode.window.showWarningMessage(`The color-coding of ${monoRepo} might appear wrong.`);
@@ -217,14 +220,14 @@ function extractPatternInSubfolders(folderPath: string): LooseObject {
 
     if (
       file.isFile() &&
-      filePath.endsWith(".py") &&
-      file.name.charAt(0) !== "."
+      file.name.endsWith(".py") &&
+      !file.name.startsWith(".")
     ) {
       const counts = extractPatterns(filePath);
       if(Object.keys(counts).length) {
         subfolderCounts[filePath] = counts;
       }
-    } else if (file.isDirectory() && file.name.charAt(0) !== ".") {
+    } else if (file.isDirectory() && !file.name.startsWith(".")) {
       // Recursively search for Python files in subdirectories
       const deeperCounts = extractPatternInSubfolders(filePath);
       if ( Object.keys(deeperCounts).length) {

@@ -92,6 +92,7 @@
         rect.style.stroke = nn.project_color;
         if (nn.project_color === "#ff0000") {
           node.style.cursor = "not-allowed";
+          node.onclick = null;
         }
       }
 
