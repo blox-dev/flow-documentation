@@ -298,9 +298,55 @@ function customFlattenObject(obj: LooseObject, parentKey: string = ''): Record<s
   return flattened;
 }
 
-function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined): Promise<Record<string, string[]>> {
+function findNearestVirtualEnv(pathToCheck: string): string {
+  let currentPath = path.resolve(pathToCheck);
+  // failsafe
+  let maxIter = 50;
+
+  while (currentPath !== path.parse(currentPath).root && maxIter > 0) {
+      const pythonBinPath = process.platform === 'win32'
+      ? path.join(currentPath, '.venv', 'Scripts', 'python.exe')
+      : path.join(currentPath, 'venv', 'bin', 'python');
+
+      if (fs.existsSync(pythonBinPath)) {
+          return pythonBinPath;
+      }
+
+      currentPath = path.dirname(currentPath);
+      maxIter -= 1;
+  }
+
+  // If no virtual environment found, set pythonBinPath to the global python interpreter
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
+function isPythonInstalled(): boolean {
+  const pythonPath = process.platform === 'win32' ? 'python' : 'python3';
+  const result = child_process.spawnSync(pythonPath, ['--version'], { stdio: 'ignore' });
+  return result.error === undefined && result.status === 0;
+}
+
+function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: LooseObject[]): Promise<Record<string, string[]>> {
   return new Promise((resolve, reject) => {
-    const pythonScriptPath = path.join(__dirname, "/../src/walk_from_func.py"); // Update with your script's path
+
+    if (isPythonInstalled() === false) {
+      reject(`Python is not installed.`);
+      return;
+    }
+
+    var workspacePath: string = vscode.workspace.workspaceFolders
+    ? vscode.workspace.workspaceFolders[0].uri.fsPath
+    : "";
+
+    let pythonPath = "";
+
+    if (workspacePath === "") {
+      pythonPath = process.platform === 'win32' ? 'python' : 'python3';
+    } else {
+      pythonPath = findNearestVirtualEnv(workspacePath);
+    }
+
+    const pythonScriptPath = vscode.Uri.joinPath(extensionUri, "src", "walk_from_func.py"); // Update with your script's path
     const endP = JSON.stringify(endPoints);
     
     // // Consider if argument size gets too large
@@ -310,11 +356,8 @@ function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined):
     var output: string[] = [];
     var errors: string[] = [];
 
-    endPoints = endPoints || [];
-
     // Run the Python script with the JSON argument
-    const pythonProcess = child_process.spawn("python", [pythonScriptPath, flow.file, flow.func, endP]);
-    // const pythonProcess = child_process.spawn("python", [pythonScriptPath]);
+    const pythonProcess = child_process.spawn(pythonPath, [pythonScriptPath.fsPath, flow.file, flow.func, endP]);
     
     pythonProcess.stdout.on("data", (data: any) => {
       console.log(data.toString());
@@ -337,9 +380,6 @@ function runPythonProg(flow: LooseObject, endPoints: LooseObject[] | undefined):
 }
 
 export function createGraph(context: vscode.ExtensionContext, flowName: string | undefined = undefined, refresh: boolean = false) {
-    // const [endP, flows, funcs] = extractRFF();
-    // // context.globalState.update("endPointMap", endPoints);
-    // vscode.window.showInformationMessage(JSON.stringify(endPoints));
     let allFlows: LooseObject[] = context.globalState.get("flows") || [];
     let routes:  LooseObject[] = context.globalState.get("routes") || [];
     let funcs: LooseObject[] = context.globalState.get("funcs") || [];
@@ -382,7 +422,7 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
         continue;
       }
       
-      runPythonProg(flows[i], routes).then((result) => {
+      runPythonProg(context.extensionUri, flows[i], routes).then((result) => {
         if (result.errors.length) {
           result.errors.forEach(err => console.error(err));
           vscode.window.showErrorMessage(`Graph generation for flow '${flowName}' failed`);
@@ -437,7 +477,7 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
         graphView.showGraph(data, flowName);
       })
       .catch((error) => {
-        vscode.window.showErrorMessage(`Graph generation failed`);
+        vscode.window.showErrorMessage(`Graph generation failed: ${error}`);
         console.error('Error:', error);
       });
     }
