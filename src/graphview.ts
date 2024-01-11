@@ -101,7 +101,7 @@ export class GraphView {
           const brkp = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
           const toRemove = brkp.filter((bp) => {
             return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, message.filePath) &&
-            message.lineno.includes(bp.location?.range.start.line);
+            linenos.includes(bp.location?.range.start.line);
           });
           vscode.debug.removeBreakpoints(toRemove);
           break;

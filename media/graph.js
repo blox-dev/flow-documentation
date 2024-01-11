@@ -204,7 +204,7 @@
           openCall.style.display = "block";
           openCall.onclick = function (e) {
             e.preventDefault();
-            openFile(sn.file, callLines[0]);
+            openFile(sn.file, callLines);
           };
 
           var openFunc = document.getElementById("open-func");

@@ -18,21 +18,24 @@ export function replaceAll(str: string, find: string, replace: string) {
     return str.replace(new RegExp(escapeRegExp(find), 'g'), replace);
 }
 
-export function openFile(filePath: string, lineno: number | undefined) {
+export function openFile(filePath: string, lineno: number | number[]) {
     vscode.workspace.openTextDocument(vscode.Uri.file(filePath)).then((document) => {
-        if (lineno) {
-          vscode.window.showTextDocument(document, {}).then((editor) => {
-              const range = new vscode.Range(lineno, 0, lineno, 0);
-              const startPosition = new vscode.Position(lineno - 1, 0); // Line numbers start from 0
-              const endPosition = new vscode.Position(lineno, 0);
-              
-              editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-              editor.selections = [new vscode.Selection(startPosition, endPosition)];
-          });
-        } else {
-          vscode.window.showTextDocument(document);
-        }
+      vscode.window.showTextDocument(document, {}).then((editor) => {
+          const linenos = typeof lineno === "number" ? [lineno] : lineno;
+          let selections = [];
+          for (let i = 0 ; i < linenos.length ; ++i) {
+            const range = new vscode.Range(linenos[i], 0, linenos[i], 0);
+            const startPosition = new vscode.Position(linenos[i] - 1, 0); // Line numbers start from 0
+            const endPosition = new vscode.Position(linenos[i], 0);
+            selections.push(new vscode.Selection(startPosition, endPosition));
+          }
+          // scroll to first appearance
+          const range = new vscode.Range(linenos[0], 0, linenos[0], 0);
+          editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+
+          editor.selections = selections;
       });
+    });
 }
 
 export function addBreakpoint(message: any) {
