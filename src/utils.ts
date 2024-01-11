@@ -40,9 +40,14 @@ export function addBreakpoint(message: any) {
     // can show in the graph though, but that's about it. With no support for launching the
     // functions from the graph, it's just confusing
     // Related: https://github.com/microsoft/vscode/issues/15178
+    const linenos = typeof message.lineno === "number" ? [message.lineno] : message.lineno;
+    const path = vscode.Uri.file(message.filePath);
+    let breakPoints = [];
 
-    const range = new vscode.Range(message.lineno, 0, message.lineno, 0);
-    const location = new vscode.Location(vscode.Uri.file(message.filePath), range);
-    const brk = new vscode.SourceBreakpoint(location);
-    vscode.debug.addBreakpoints([brk]);
+    for (let i=0 ; i < linenos.length ; ++i) {
+      const range = new vscode.Range(linenos[i], 0, linenos[i], 0);
+      const location = new vscode.Location(path, range);
+      breakPoints.push(new vscode.SourceBreakpoint(location));
+    }
+    vscode.debug.addBreakpoints(breakPoints);
 }

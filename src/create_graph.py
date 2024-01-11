@@ -106,4 +106,4 @@ def create_graph(module, target_func, asts):
     # graph = ["graph TD"]
     # for (start_id, end_id) in gm.graph:
     #     graph.append(f"{asts2[start_id]['func_name']} --> {asts2[end_id]['func_name']}")
-    return {'nodes': [{k:v for k,v in ast.items() if k != 'ast'} for ast in asts], 'edges': [[k[0], k[1], v] for (k, v) in gm.graph.items()]}
+    return {'nodes': [{k:v for k,v in ast.items() if k != 'ast'} for ast in asts], 'edges': [{'start_node': k[0], 'end_node': k[1], 'call_lines': v} for (k, v) in gm.graph.items()]}

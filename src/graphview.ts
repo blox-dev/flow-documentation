@@ -30,11 +30,25 @@ export class GraphView {
     panel.webview.onDidReceiveMessage((message) => {
       switch (message.command) {
         case "fetchGraphData": {
+          let breakPoints = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
+
           let graph: String[] = ["graph TD"];
           for (let i = 0; i < data.graph.edges.length; ++i) {
-            const [startId, endId, _callLineno] = data.graph.edges[i];
+            const edge = data.graph.edges[i];
+
+            // match all breakpoints
+            const startNode = data.graph.nodes[edge.start_node];
+            const endNode = data.graph.nodes[edge.end_node];
+
+            let breakP = breakPoints.filter((bp) => {
+              return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, startNode.file) &&
+              edge.call_lines.includes(bp.location?.range.start.line + 1);
+            });
+
+            edge.hasBreakpoint = breakP.length === edge.call_lines.length;
+
             graph.push(
-              `${data.graph.nodes[startId]["func_name"]} ==> ${data.graph.nodes[endId]["func_name"]}`
+              `${startNode.func_name} ==> ${endNode.func_name}`
             );
           }
           let graphString: String = graph.join("\n");
@@ -46,8 +60,6 @@ export class GraphView {
             legend.set(node.project_color, x[x.length - 1]);
 
             // match possible breakpoint
-            let breakPoints = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
-
             let breakP = breakPoints.filter((bp) => {
               return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, node.file) &&
               node.lineno === bp.location?.range.start.line - 1;
@@ -85,10 +97,11 @@ export class GraphView {
           break;
         }
         case "removeBreakpoint": {
+          const linenos = typeof message.lineno === "number" ? [message.lineno] : message.lineno;
           const brkp = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
           const toRemove = brkp.filter((bp) => {
             return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, message.filePath) &&
-            message.lineno === bp.location?.range.start.line;
+            message.lineno.includes(bp.location?.range.start.line);
           });
           vscode.debug.removeBreakpoints(toRemove);
           break;
@@ -140,6 +153,9 @@ export class GraphView {
             </a>
             <a id="add-brk-call">
               Add breakpoint to function call
+            </a>
+            <a id="rem-brk-call">
+              Remove breakpoint from function call
             </a>
             <a id="add-brk-func">
               Add breakpoint to function definition

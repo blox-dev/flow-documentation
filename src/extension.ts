@@ -6,7 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
 import { FlowsViewProvider } from "./webview";
-import {addBreakpoint, openFile, pathsAreEqual, replaceAll} from "./utils";
+import { pathsAreEqual } from "./utils";
 import { GraphView } from "./graphview";
 // import * as zlib from 'zlib';
 
@@ -370,9 +370,9 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
       flows = allFlows;
     }
 
-    const graphView = new GraphView(context);
 
     for(let i = 0 ; i< flows.length ; ++i) {
+      const graphView = new GraphView(context);
       const flowName = flows[i].name;
 
       // check if graph is in memory

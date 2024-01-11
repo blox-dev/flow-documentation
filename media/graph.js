@@ -126,6 +126,9 @@
           addBrkCall.style.display = "none";
           addBrkCall.onclick = null;
 
+          var remBrkCall = document.getElementById("rem-brk-call");
+          remBrkCall.style.display = "none";
+          remBrkCall.onclick = null;
 
           if (nn.hasBreakpoint) {
             var addBrkFunc = document.getElementById("add-brk-func");
@@ -180,9 +183,17 @@
       const sn = nodeData.filter((x) => x.func_name === start_node_name)[0];
       const en = nodeData.filter((x) => x.func_name === end_node_name)[0];
 
-      const callLines = edgeData.filter(
-        (x) => x[0] === sn.id && x[1] === en.id
-      )[0][2];
+      const edggge = edgeData.filter(
+        (x) => x.start_node === sn.id && x.end_node === en.id
+      )[0];
+
+      const callLines = edggge.call_lines;
+
+      if (edggge.hasBreakpoint) {
+        edge.style.stroke = "red";
+      } else {
+        edge.style.stroke = "#333333";
+      }
 
       // add context menu
       edge.addEventListener(
@@ -199,17 +210,44 @@
           var openFunc = document.getElementById("open-func");
           openFunc.style.display = "none";
           openFunc.onclick = null;
+          
+          if (edggge.hasBreakpoint) {
+            var addBrkCall = document.getElementById("add-brk-call");
+            addBrkCall.style.display = "none";
+            addBrkCall.onclick = null;
 
-          var addBrkCall = document.getElementById("add-brk-call");
-          addBrkCall.style.display = "block";
-          addBrkCall.onclick = function (e) {
-            e.preventDefault();
-            addBreakpoint(sn.file, callLines[0] - 1);
-          };
+            var remBrkCall = document.getElementById("rem-brk-call");
+            remBrkCall.style.display = "block";
+            remBrkCall.onclick = function (e) {
+              e.preventDefault();
+
+              removeBreakpoint(sn.file, callLines.map(function (elem) {return elem - 1;}));
+              edggge.hasBreakpoint = false;
+              updateEdges(nodeData, edgeData);
+            };
+          } else {
+            var addBrkCall = document.getElementById("add-brk-call");
+            addBrkCall.style.display = "block";
+            addBrkCall.onclick = function (e) {
+              e.preventDefault();
+
+              addBreakpoint(sn.file, callLines.map(function (elem) {return elem - 1;}));
+              edggge.hasBreakpoint = true;
+              updateEdges(nodeData, edgeData);
+            };
+
+            var remBrkCall = document.getElementById("rem-brk-call");
+            remBrkCall.style.display = "none";
+            remBrkCall.onclick = null;
+          }
 
           var addBrkFunc = document.getElementById("add-brk-func");
           addBrkFunc.style.display = "none";
           addBrkFunc.onclick = null;
+
+          var remBrkFunc = document.getElementById("rem-brk-func");
+          remBrkFunc.style.display = "none";
+          remBrkFunc.onclick = null;
 
           // display menu
           var posX = e.clientX;
