@@ -12,7 +12,7 @@
     switch (message.command) {
       case "setGraphData": {
         console.log("setGraphData", message);
-        doStuff(message.graphData, message.graphString, message.legendString);
+        doStuff(message.graphData, message.graphString, message.legendString, message.affectedFiles);
         break;
       }
     }
@@ -45,7 +45,7 @@
     }, 501);
   }
 
-  async function doStuff(graphData, graphString, legendString) {
+  async function doStuff(graphData, graphString, legendString, affectedFiles) {
     const htmlCode = await mermaid.mermaidAPI.render(
       "mermaidChart",
       graphString
@@ -66,6 +66,18 @@
     console.log(edgeData);
     updateEdges(nodeData, edgeData);
     
+    const affList = document.querySelector(".affected-files-list");
+    while (affList.firstChild) {
+      affList.removeChild(affList.firstChild);
+    }
+
+    for (const [file, funcs] of Object.entries(affectedFiles)) {
+      console.log(file, funcs);
+      let li = document.createElement("li");
+      li.innerHTML = file + ": " + funcs.join(', ');
+      affList.appendChild(li);
+    }
+
     // hide menu
     document.addEventListener(
       "click",

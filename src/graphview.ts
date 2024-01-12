@@ -54,6 +54,8 @@ export class GraphView {
           let graphString: String = graph.join("\n");
 
           let legend = new Map();
+          let affectedFiles = new Map();
+
           for (let i=0 ; i<data.graph.nodes.length; ++i) {
             let node = data.graph.nodes[i];
             const x = node.project_path.split("\\");
@@ -66,6 +68,14 @@ export class GraphView {
             });
             
             node.hasBreakpoint = breakP.length !== 0 ? true : false;
+
+            if (affectedFiles.has(node.file)) {
+              let arr = affectedFiles.get(node.file);
+              arr.push(node.func_name);
+              affectedFiles.set(node.file, arr);
+            } else {
+              affectedFiles.set(node.file, [node.func_name]);
+            }
           }
 
           let legendHtml = [];
@@ -80,11 +90,14 @@ export class GraphView {
           let legendString =
             '<div class="legend-title">Projects</div>' + legendHtml.join("");
 
+          // affected files
+
           this._view?.postMessage({
             command: "setGraphData",
             graphData: data,
             graphString: graphString,
             legendString: legendString,
+            affectedFiles: Object.fromEntries(affectedFiles.entries()),
           });
           break;
         }
@@ -141,7 +154,15 @@ export class GraphView {
               Loading...
             </div>
       
-            <div class="legend" />
+            <div class="legend">
+            </div>
+          </div>
+
+          <div class="affected-files-div">
+            <h4>Affected files</h4>
+            <ul class="affected-files-list">
+              <li>hi</li>
+            </ul>
           </div>
       
           <div id="menu">

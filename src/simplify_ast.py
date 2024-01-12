@@ -97,7 +97,7 @@ class SimplifyAST(ast.NodeTransformer):
         return self.generic_visit(node)
     
     def visit_Return(self, node):
-        return None
+        return self.generic_visit(node)
 
     def visit_Pass(self, node):
         return None
