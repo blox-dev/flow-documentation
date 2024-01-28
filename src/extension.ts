@@ -436,8 +436,8 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
         }
         const data = JSON.parse(result.outputs[0]);
         // match graph funcs with extracted funcs
-        for (let i = 0 ; i< data.graph.nodes.length ; i++) {
-          let node = data.graph.nodes[i];
+        for (let id in data.graph.nodes) {
+          let node = data.graph.nodes[id];
 
           // Node is a http call
           let unknownNode = false;

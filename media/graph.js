@@ -92,8 +92,10 @@
   function updateNodes(nodeData) {
     const nodes = document.querySelectorAll(".node");
     nodes.forEach((node) => {
-      const textContent = node.textContent;
-      const nn = nodeData.filter((x) => x.func_name === textContent)[0];
+      const nodeId = node.id;
+      [_L, node_name, _EdgeNum] = nodeId.split("-");
+
+      const nn = nodeData[node_name];
       node.onclick = () => {
         openFile(nn.file, nn.lineno + 1);
       };
@@ -193,11 +195,11 @@
 
       [_L, start_node_name, end_node_name, _EdgeNum] = id.split("-");
 
-      const sn = nodeData.filter((x) => x.func_name === start_node_name)[0];
-      const en = nodeData.filter((x) => x.func_name === end_node_name)[0];
+      const sn = nodeData[start_node_name];
+      const en = nodeData[end_node_name];
 
       const edggge = edgeData.filter(
-        (x) => x.start_node === sn.id && x.end_node === en.id
+        (x) => x.start_node === start_node_name && x.end_node === end_node_name
       )[0];
 
       const callLines = edggge.call_lines;

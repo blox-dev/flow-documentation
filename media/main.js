@@ -52,7 +52,7 @@
             // no flows, display help message
             let tr = document.createElement("tr");
             let p = document.createElement("p");
-            p.innerHTML = "No flows detected. Create a flow by choosing a function to debug then adding the comment <br/><br/><b># flow-start(&lt;flow name&gt;)</b><br/><br/> before its header";
+            p.innerHTML = "No flows detected. Create a flow by choosing a function to debug then adding the comment <br/><br/><b># flow-start(&lt;flow name&gt;)</b><br/><br/> before the function header";
             tr.appendChild(p);
             table.appendChild(tr);
             return;

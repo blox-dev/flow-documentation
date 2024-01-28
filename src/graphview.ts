@@ -48,7 +48,7 @@ export class GraphView {
             edge.hasBreakpoint = breakP.length === edge.call_lines.length;
 
             graph.push(
-              `${startNode.func_name} ==> ${endNode.func_name}`
+              `${startNode.func_name}[${startNode.func_name}] ==> ${endNode.func_name}[${endNode.func_name}]`
             );
           }
           let graphString: String = graph.join("\n");
@@ -56,8 +56,8 @@ export class GraphView {
           let legend = new Map();
           let affectedFiles = new Map();
 
-          for (let i=0 ; i<data.graph.nodes.length; ++i) {
-            let node = data.graph.nodes[i];
+          for (const id in data.graph.nodes) {
+            let node = data.graph.nodes[id];
             const x = node.project_path.split("\\");
             legend.set(node.project_color, x[x.length - 1]);
 
