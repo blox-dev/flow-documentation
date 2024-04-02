@@ -1,0 +1,65 @@
+{
+    "create_name": {
+        "contact": {},
+        "route_expr": "/keys",
+        "module": "main",
+        "func_name": "create_name",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    },
+    "read_name": {
+        "contact": {},
+        "route_expr": "/keys/<key>",
+        "module": "main",
+        "func_name": "read_name",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    },
+    "update_name": {
+        "contact": {},
+        "route_expr": "/keys/<key>",
+        "module": "main",
+        "func_name": "update_name",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    },
+    "delete_name": {
+        "contact": {},
+        "route_expr": "/keys/<key>",
+        "module": "main",
+        "func_name": "delete_name",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    },
+    "print_database": {
+        "contact": {},
+        "route_expr": "/debug",
+        "module": "main",
+        "func_name": "print_database",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    },
+    "logout": {
+        "contact": {},
+        "route_expr": "/logout",
+        "module": "views",
+        "func_name": "logout",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    },
+    "register": {
+        "contact": {},
+        "route_expr": "/register",
+        "module": "views",
+        "func_name": "register",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    },
+    "login": {
+        "contact": {},
+        "route_expr": "/login",
+        "module": "views",
+        "func_name": "login",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    },
+    "index": {
+        "contact": {},
+        "route_expr": "/<path>",
+        "module": "views",
+        "func_name": "index",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    }
+}

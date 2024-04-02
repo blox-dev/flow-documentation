@@ -1,14 +1,8 @@
 import ast
 from collections import defaultdict
 
-def is_same_function(f1, f2):
-    return f1["module"] == f2["module"] and f1["func_name"] == f2["func_name"]
-
 def is_same_node(f1, f2):
     return f1["module"] == f2["module"] and f1["func_name"] == f2["func_name"] and f1["file"] == f2["file"]
-
-def get_func_id_by_name(name, listfs):
-    return list(filter(lambda x: x["func_name"] == name, listfs))[0]["id"]
 
 class GraphMaker(ast.NodeVisitor):
     def __init__(self, nodes, start_id, max_id):

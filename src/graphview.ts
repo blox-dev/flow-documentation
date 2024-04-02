@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
-import { extractRFF, createGraph, LooseObject } from "./extension";
+import { LooseObject } from "./extension";
 import { openFile, addBreakpoint, pathsAreEqual } from "./utils";
 
 export class GraphView {
-  public static readonly viewType = "flow-documentation.flowsView";
 
   private _view?: vscode.Webview;
 
@@ -149,8 +148,8 @@ export class GraphView {
         </head>
         <body>
           
-          <div style="display:flex; flex-direction:row;">
-            <div id="mermaidGraph">
+          <div style="display:flex; flex-direction:row">
+            <div id="mermaidGraph" style="width:50%">
               Loading...
             </div>
       

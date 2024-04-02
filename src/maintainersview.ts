@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import { extractRFF, createGraph, LooseObject } from './extension';
 import { openFile, replaceAll } from './utils';
 
-export class FlowsViewProvider implements vscode.WebviewViewProvider {
+export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 
-	public static readonly viewType = 'flow-documentation.flowsView';
+	public static readonly viewType = 'flow-documentation.maintainersView';
 
 	private _view?: vscode.WebviewView;
 
@@ -33,41 +33,20 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 		};
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-
-		webviewView.webview.onDidReceiveMessage(data => {
-			switch (data.command) {
-				case 'fetchFlows':
-					{
-						this.fetchFlows();
-						break;
-					}
-				case 'openFile':
-					{
-						openFile(data.filePath, data.lineno);
-						break;
-					}
-				case 'createGraph':
-					{
-						createGraph(this._context, data.flowName, data.refresh);
-						break;
-					}
-			}
-		});
 	}
 
-	public fetchFlows() {
-		const [endP, flows, funcs] = extractRFF(this._context);
-		this._view?.webview.postMessage({command: 'updateFlows', flows: flows});
+	public displayMaintainers(maintainers: any) {
+		this._view?.webview.postMessage({command: 'updateMaintainers', maintainers: maintainers});
 	}
 
-	private _getHtmlForWebview(webview: vscode.Webview, flowData: LooseObject[] = []) {
+	private _getHtmlForWebview(webview: vscode.Webview) {
 		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.js'));
 
 		// Do the same for the stylesheet.
 		const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css'));
 		const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css'));
-		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
+		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.css'));
 
 		// Use a nonce to only allow a specific script to be run.
 		const nonce = getNonce();
@@ -94,9 +73,13 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 				<title>Flow Documentation</title>
 			</head>
 			<body>
-                <button class="fetch-flows-button">Fetch flows</button>
+				<p id="info_help">
+					Right click on a file or folder and select <b>Show Maintainer</b> to open the list of active maintainers.
+				</p>
 
-				<table id="flow-table" class="flow-list"></table>
+				<h3 id="maintainer-title"></h3>
+
+				<table id="maintainer-table" class="maintainer-list"></table>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>
 			</body>

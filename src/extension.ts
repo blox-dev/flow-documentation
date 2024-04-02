@@ -5,7 +5,8 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as child_process from "child_process";
-import { FlowsViewProvider } from "./webview";
+import { FlowsViewProvider } from "./flowsView";
+import { MaintainersViewProvider } from "./maintainersview";
 import { pathsAreEqual } from "./utils";
 import { GraphView } from "./graphview";
 // import * as zlib from 'zlib';
@@ -23,9 +24,15 @@ export function activate(context: vscode.ExtensionContext) {
     'Congratulations, your extension "flow-documentation" is now active!'
   );
 
-  const provider = new FlowsViewProvider(context);
+  const flowsViewProvider = new FlowsViewProvider(context);
   context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, provider));
+		vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider)
+  );
+
+  const maintainersViewProvider = new MaintainersViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(MaintainersViewProvider.viewType, maintainersViewProvider)
+  )
 
   console.log(context.globalState.get("routes"));
   console.log(context.globalState.get("flows"));
@@ -39,14 +46,57 @@ export function activate(context: vscode.ExtensionContext) {
     "flow-documentation.createGraphs",
     () => {
       // update flow webview
-      provider.fetchFlows();
+      flowsViewProvider.fetchFlows();
       
       // create the graphs
       createGraph(context);
     }
   );
+  const disposable2 = vscode.commands.registerCommand(
+    "flow-documentation.showMaintainer",
+    () => {
+      fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "codeMaintainerMap.json").fsPath, function (err, data) {
+        if (err) {
+          vscode.window.showErrorMessage(err.message);
+          return;
+        }
+        let codeMaintainerMap: LooseObject = {};
+        
+        try {
+          codeMaintainerMap = JSON.parse(data.toString());
+        } catch {
+          console.log("Invalid json config")
+        }
+        const maintainers: LooseObject[] = findMaintainers(codeMaintainerMap);
+        maintainersViewProvider.displayMaintainers(maintainers);
+
+        vscode.window.showInformationMessage("Hello");
+      });
+    }
+  );
 
   context.subscriptions.push(disposable);
+  context.subscriptions.push(disposable2);
+}
+
+function findMaintainers (codeMaintainerMap: LooseObject): LooseObject[] {
+  var activeFilePath = vscode.window.activeTextEditor?.document.fileName || "";
+
+  var maintainers: LooseObject[] = [];
+
+  for (var i=0 ; i < codeMaintainerMap.length ; ++i) {
+    const code = codeMaintainerMap[i].maintains;
+    for (var j=0 ; j < code.length ; ++j) {
+      const index = path.normalize(activeFilePath).indexOf(path.normalize(code[j].path))
+      if (index === -1) {
+        continue;
+      }
+      console.log(codeMaintainerMap[i].contact);
+      maintainers.push(codeMaintainerMap[i].contact);
+      break;
+    }
+  }
+  return maintainers;
 }
 
 // This method is called when your extension is deactivated
@@ -56,7 +106,7 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const content = fs.readFileSync(filePath, "utf8");
   const modName = path.basename(filePath, path.extname(filePath));
 
-  const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g; // Use a regular expression to find the word "count"
+  const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g;
   const funcPattern = /def\s+(.+)\s*\(.*\)\s*:/g;
   const flowStartPattern = /#+\s*flow-start\((.+)\)/g;
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
@@ -198,6 +248,36 @@ export function extractRFF(context: vscode.ExtensionContext) {
   context.globalState.update("routes", routes);
   context.globalState.update("flows", flows);
   context.globalState.update("funcs", funcs);
+
+  fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, function (err, data) {
+    if (err) {
+      console.log(err);
+      return;
+    }
+    let endP: LooseObject = {};
+    
+    try {
+      endP = JSON.parse(data.toString());
+    } catch {
+      console.log("Invalid json config")
+    }
+    for (let i=0 ; i< routes.length ; ++i) {
+      const route = routes[i];
+      
+      // TODO: unique id for each route
+      const routeId = route.func_name;
+      
+      endP[routeId] = {
+        "contact": {},
+        "route_expr": route.name,
+        "module": route.module,
+        "func_name": route.func_name,
+        "route_file": route.file, 
+      }
+    }
+    const routeStr = JSON.stringify(endP, null, 4);
+    fs.writeFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, routeStr, 'utf8', function () {}); 
+  })
 
   let tmp = new Set();
   flows.forEach((f) => {

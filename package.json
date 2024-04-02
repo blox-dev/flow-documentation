@@ -20,13 +20,22 @@
 					"type": "webview",
 					"id": "flow-documentation.flowsView",
 					"name": "Flow Documentation"
-				}
+				},
+        {
+          "type": "webview",
+          "id": "flow-documentation.maintainersView",
+          "name": "Maintainers"
+        }
 			]
 		},
     "commands": [
       {
         "command": "flow-documentation.createGraphs",
         "title": "Create Graphs"
+      },
+      {
+        "command": "flow-documentation.showMaintainer",
+        "title": "Show Maintainer"
       }
     ],
     "configuration": {
@@ -39,6 +48,13 @@
           "description": "List of extra folders to scan."
         }
       }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "flow-documentation.showMaintainer"
+        }
+      ]
     }
   },
   "scripts": {

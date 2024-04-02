@@ -260,7 +260,7 @@ try:
     # print(sys.argv, argc)
     if argc < 3:
         filepath = "F:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\gpt.py"
-        func_name = "parse_code"
+        func_name = "xd"
         lets_go(filepath, func_name, routes=sample_routes)
     else:
         filepath = sys.argv[1]
