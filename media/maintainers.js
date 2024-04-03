@@ -11,8 +11,8 @@
         switch (message.command) {
             case 'updateMaintainers':
                 {
-                    console.log('updateMaintainers', message.maintainers);
-                    updateMaintainersTable(message.maintainers);
+                    console.log('updateMaintainers', message);
+                    updateMaintainersTable(message.activeFilePath, message.maintainers);
                     break;
                 }
         }
@@ -28,7 +28,7 @@
         vscode.postMessage({ command: 'createGraph', flowName, refresh});
     }
 
-    function updateMaintainersTable(maintainers) {
+    function updateMaintainersTable(filepath, maintainers) {
         let infoParagraph = document.querySelector('#info_help');
         infoParagraph.textContent = "";
 
@@ -38,6 +38,12 @@
         while (table.firstChild) {
             table.removeChild(table.firstChild);
         }
+
+        let title = document.querySelector('#maintainer-title');
+
+        let filepathSplit = filepath.split('\\');
+        let filename = filepathSplit[filepathSplit.length - 1];
+        title.textContent = "Maintainers of " + filename;
         
         if (maintainers.length === 0) {
             // no maintainers, display help message
@@ -49,21 +55,29 @@
             return;
         }
 
-        let title = document.querySelector('#maintainer-title');
-        title.textContent = "Maintainers of <file_name>";
-
         maintainers.forEach((maintainer) => {
             let tr = document.createElement("tr");
             tr.className = "maintainer-entry";
-            let td = document.createElement("td");
-            td.className = "maintainer-input";
 
-            let a = document.createElement("p");
-            a.innerText = maintainer.name + " / " + maintainer.email + " / " + maintainer.phone;
+            let p = document.createElement("p");
+            p.innerText = maintainer.name + " / " + maintainer.email + " / " + maintainer.phone;
 
-            td.appendChild(a);
-            tr.appendChild(td);
+            tr.appendChild(p);
             table.appendChild(tr);
+
+            for (const [key, value] of Object.entries(maintainer)) {
+                if (key === "name") {
+                    continue;
+                }
+                let tr = document.createElement("tr");
+                tr.className = "maintainer-entry";
+                
+                let p = document.createElement("p");
+                p.innerText = "\t> " + key + ": " + value;
+
+                tr.appendChild(p);
+                table.appendChild(tr);
+            }
 		});
     }
 }());

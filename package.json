@@ -54,6 +54,11 @@
         {
           "command": "flow-documentation.showMaintainer"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "flow-documentation.showMaintainer"
+        }
       ]
     }
   },

@@ -35,8 +35,8 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 	}
 
-	public displayMaintainers(maintainers: any) {
-		this._view?.webview.postMessage({command: 'updateMaintainers', maintainers: maintainers});
+	public displayMaintainers(activeFilePath: string, maintainers: LooseObject[]) {
+		this._view?.webview.postMessage({command: 'updateMaintainers', maintainers: maintainers, activeFilePath: activeFilePath});
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
@@ -77,7 +77,7 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 					Right click on a file or folder and select <b>Show Maintainer</b> to open the list of active maintainers.
 				</p>
 
-				<h3 id="maintainer-title"></h3>
+				<h1 id="maintainer-title"></h1>
 
 				<table id="maintainer-table" class="maintainer-list"></table>
 

@@ -54,8 +54,9 @@ export function activate(context: vscode.ExtensionContext) {
   );
   const disposable2 = vscode.commands.registerCommand(
     "flow-documentation.showMaintainer",
-    () => {
-      fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "codeMaintainerMap.json").fsPath, function (err, data) {
+    (thisFilePath) => {
+      fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "codeMaintainerMap.json").fsPath, readFileCallback);
+      function readFileCallback(err: any, data: any) {
         if (err) {
           vscode.window.showErrorMessage(err.message);
           return;
@@ -67,11 +68,13 @@ export function activate(context: vscode.ExtensionContext) {
         } catch {
           console.log("Invalid json config")
         }
-        const maintainers: LooseObject[] = findMaintainers(codeMaintainerMap);
-        maintainersViewProvider.displayMaintainers(maintainers);
+        var activeFilePath = thisFilePath?.fsPath || "";
+        const maintainers: LooseObject[] = findMaintainers(activeFilePath, codeMaintainerMap);
+        
+        maintainersViewProvider.displayMaintainers(activeFilePath, maintainers);
 
         vscode.window.showInformationMessage("Hello");
-      });
+      }
     }
   );
 
@@ -79,8 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable2);
 }
 
-function findMaintainers (codeMaintainerMap: LooseObject): LooseObject[] {
-  var activeFilePath = vscode.window.activeTextEditor?.document.fileName || "";
+function findMaintainers (activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject[] {
 
   var maintainers: LooseObject[] = [];
 
