@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { extractRFF, createGraph, LooseObject } from './extension';
-import { openFile, replaceAll } from './utils';
+import { LooseObject } from './extension';
+import { openFile } from './utils';
 
 export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 
@@ -33,22 +33,29 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 		};
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+		webviewView.webview.onDidReceiveMessage(data => {
+			switch (data.command) {
+				case 'openFile':
+					{
+						openFile(data.filePath, data.lineno);
+						break;
+					}
+			}
+		});
 	}
 
-	public displayMaintainers(activeFilePath: string, maintainers: LooseObject[]) {
-		this._view?.webview.postMessage({command: 'updateMaintainers', maintainers: maintainers, activeFilePath: activeFilePath});
+	public displayMaintainers(maintainerMapPath: string, activeFilePath: string, maintainers: LooseObject[]) {
+		this._view?.webview.postMessage({ command: 'updateMaintainers', maintainers: maintainers, activeFilePath: activeFilePath, maintainerMapPath: maintainerMapPath });
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
-		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.js'));
 
-		// Do the same for the stylesheet.
 		const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css'));
 		const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css'));
 		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.css'));
 
-		// Use a nonce to only allow a specific script to be run.
 		const nonce = getNonce();
 
 		return `<!DOCTYPE html>

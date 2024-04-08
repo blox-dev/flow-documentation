@@ -26,13 +26,56 @@ export function activate(context: vscode.ExtensionContext) {
 
   const flowsViewProvider = new FlowsViewProvider(context);
   context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider)
+    vscode.window.registerWebviewViewProvider(FlowsViewProvider.viewType, flowsViewProvider)
   );
 
   const maintainersViewProvider = new MaintainersViewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(MaintainersViewProvider.viewType, maintainersViewProvider)
-  )
+  );
+
+  function promptMaintainerMap(warningMessage: string, buttonMessage: string) {
+    vscode.window.showWarningMessage(warningMessage, buttonMessage).then(selection => {
+      if (selection === buttonMessage) {
+        vscode.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          filters: {
+            'JSON files': ['json']
+          }
+        }).then(fileUri => {
+          if (fileUri && fileUri[0]) {
+            const chosenJsonFilePath = fileUri[0].fsPath;
+            // Save chosen JSON file path in global context
+            context.globalState.update('codeMaintainerMapPath', chosenJsonFilePath);
+            vscode.window.showInformationMessage('JSON file located and saved');
+          }
+        });
+      }
+    });
+  }
+
+  function checkMaintainerMap() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders && workspaceFolders.length > 0) {
+      const rootPath = workspaceFolders[0].uri.fsPath;
+      const maintainerMapPath = path.join(rootPath, 'codeMaintainerMap.json');
+      const lastSavedPath = context.globalState.get('codeMaintainerMapPath');
+
+      if (fs.existsSync(maintainerMapPath)) {
+        vscode.window.showInformationMessage('Found codeMaintainerMap.json');
+        context.globalState.update('codeMaintainerMapPath', maintainerMapPath);
+      } else if (lastSavedPath) {
+        promptMaintainerMap('Using ' + lastSavedPath, 'Change JSON location');
+      } else {
+        promptMaintainerMap('maintainerMap.json not found', 'Locate JSON File');
+      }
+    }
+  };
+
+  // Call the function when the extension is activated
+  checkMaintainerMap();
 
   console.log(context.globalState.get("routes"));
   console.log(context.globalState.get("flows"));
@@ -47,7 +90,7 @@ export function activate(context: vscode.ExtensionContext) {
     () => {
       // update flow webview
       flowsViewProvider.fetchFlows();
-      
+
       // create the graphs
       createGraph(context);
     }
@@ -55,25 +98,35 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable2 = vscode.commands.registerCommand(
     "flow-documentation.showMaintainer",
     (thisFilePath) => {
-      fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "codeMaintainerMap.json").fsPath, readFileCallback);
-      function readFileCallback(err: any, data: any) {
-        if (err) {
-          vscode.window.showErrorMessage(err.message);
-          return;
-        }
-        let codeMaintainerMap: LooseObject = {};
-        
-        try {
-          codeMaintainerMap = JSON.parse(data.toString());
-        } catch {
-          console.log("Invalid json config")
-        }
-        var activeFilePath = thisFilePath?.fsPath || "";
-        const maintainers: LooseObject[] = findMaintainers(activeFilePath, codeMaintainerMap);
-        
-        maintainersViewProvider.displayMaintainers(activeFilePath, maintainers);
+      let codeMaintainerMapPath: string | undefined = context.globalState.get('codeMaintainerMapPath');
+      if (codeMaintainerMapPath === undefined) {
+        promptMaintainerMap('maintainerMap.json not found', 'Locate JSON File');
+        return;
+      } else {
+        fs.readFile(codeMaintainerMapPath, readFileCallback);
+        function readFileCallback(err: any, data: any) {
+          if (err) {
+            if (err.code === 'ENOENT') {
+              // file changed or renamed
+              context.globalState.update('codeMaintainerMapPath', undefined);
+              promptMaintainerMap('maintainerMap.json not found', 'Locate JSON File');
+              return;
+            }
+            vscode.window.showErrorMessage(err.message);
+            return;
+          }
+          let codeMaintainerMap: LooseObject = {};
 
-        vscode.window.showInformationMessage("Hello");
+          try {
+            codeMaintainerMap = JSON.parse(data.toString());
+          } catch {
+            console.log("Invalid json config");
+          }
+          var activeFilePath = thisFilePath?.fsPath || "";
+          const maintainers: LooseObject[] = findMaintainers(activeFilePath, codeMaintainerMap);
+
+          maintainersViewProvider.displayMaintainers(codeMaintainerMapPath || "", activeFilePath, maintainers);
+        }
       }
     }
   );
@@ -82,14 +135,14 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable2);
 }
 
-function findMaintainers (activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject[] {
+function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject[] {
 
   var maintainers: LooseObject[] = [];
 
-  for (var i=0 ; i < codeMaintainerMap.length ; ++i) {
+  for (var i = 0; i < codeMaintainerMap.length; ++i) {
     const code = codeMaintainerMap[i].maintains;
-    for (var j=0 ; j < code.length ; ++j) {
-      const index = path.normalize(activeFilePath).indexOf(path.normalize(code[j].path))
+    for (var j = 0; j < code.length; ++j) {
+      const index = path.normalize(activeFilePath).indexOf(path.normalize(code[j].path));
       if (index === -1) {
         continue;
       }
@@ -102,7 +155,7 @@ function findMaintainers (activeFilePath: string, codeMaintainerMap: LooseObject
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() { }
 
 function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const content = fs.readFileSync(filePath, "utf8");
@@ -114,8 +167,8 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
 
   var match;
-  var matches: Record<string, LooseObject[]> = {routes: [], funcs: [], flowStart: [], flowEnd: []};
-  
+  var matches: Record<string, LooseObject[]> = { routes: [], funcs: [], flowStart: [], flowEnd: [] };
+
 
   // match routes
   while ((match = routePattern.exec(content))) {
@@ -123,10 +176,10 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
       .slice(0, match.index)
       .split("\n").length;
     const nextLines = content.slice(match.index).split("\n");
-    for (let i = 0 ; i < nextLines.length ; ++i) {
+    for (let i = 0; i < nextLines.length; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches.routes.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func_name: x[1]});
+        matches.routes.push({ module: modName, name: match[1], lineno: lineCountBeforeMatch, func_name: x[1] });
         break;
       }
     }
@@ -137,7 +190,7 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
     const lineCountBeforeMatch = content
       .slice(0, match.index)
       .split("\n").length;
-    matches.funcs.push({module: modName, name: match[1], lineno: lineCountBeforeMatch - 1});
+    matches.funcs.push({ module: modName, name: match[1], lineno: lineCountBeforeMatch - 1 });
   }
 
   // match flow-start(<flow-name>)
@@ -146,10 +199,10 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
       .slice(0, match.index)
       .split("\n").length;
     const nextLines = content.slice(match.index).split("\n");
-    for (let i = 0 ; i < nextLines.length ; ++i) {
+    for (let i = 0; i < nextLines.length; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches.flowStart.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.flowStart.push({ module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1] });
         break;
       }
     }
@@ -161,10 +214,10 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
       .slice(0, match.index)
       .split("\n").length;
     const nextLines = content.slice(match.index).split("\n");
-    for (let i = 0 ; i < nextLines.length ; ++i) {
+    for (let i = 0; i < nextLines.length; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches.flowEnd.push({module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1]});
+        matches.flowEnd.push({ module: modName, name: match[1], lineno: lineCountBeforeMatch, func: x[1] });
         break;
       }
     }
@@ -202,14 +255,14 @@ export function extractRFF(context: vscode.ExtensionContext) {
     const files = fs.readdirSync(monoRepo, { withFileTypes: true }).filter(dirent => !dirent.name.startsWith('.'));
     const folders = files.filter(dirent => dirent.isDirectory()).map(dirent => dirent.name);
     if (files.length > folders.length) {
-    vscode.window.showWarningMessage(`The color-coding of ${monoRepo} might appear wrong.`);
+      vscode.window.showWarningMessage(`The color-coding of ${monoRepo} might appear wrong.`);
     }
     folders.forEach((folder) => {
       const folderPath = path.isAbsolute(folder)
         ? folder
         : vscode.workspace.workspaceFolders
-        ? path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, folder)
-        : null;
+          ? path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, folder)
+          : null;
       if (folderPath === null) {
         return;
       }
@@ -222,13 +275,13 @@ export function extractRFF(context: vscode.ExtensionContext) {
 
       // Add project info to each function and funcs
       let [projectRoutes, projectFlows, projectFuncs] = flattenRFF(subfolderCounts);
-      
+
       if (!(projectRoutes.length || projectFlows.length || projectFuncs.length)) {
         // empty project
         return;
       }
       let projectColor = colors[colorIndex++];
-      
+
       for (let i = 0; i < projectRoutes.length; ++i) {
         projectRoutes[i].project_path = folderPathNorm;
         projectRoutes[i].project_color = projectColor;
@@ -257,29 +310,29 @@ export function extractRFF(context: vscode.ExtensionContext) {
       return;
     }
     let endP: LooseObject = {};
-    
+
     try {
       endP = JSON.parse(data.toString());
     } catch {
-      console.log("Invalid json config")
+      console.log("Invalid json config");
     }
-    for (let i=0 ; i< routes.length ; ++i) {
+    for (let i = 0; i < routes.length; ++i) {
       const route = routes[i];
-      
+
       // TODO: unique id for each route
       const routeId = route.func_name;
-      
+
       endP[routeId] = {
         "contact": {},
         "route_expr": route.name,
         "module": route.module,
         "func_name": route.func_name,
-        "route_file": route.file, 
-      }
+        "route_file": route.file,
+      };
     }
     const routeStr = JSON.stringify(endP, null, 4);
-    fs.writeFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, routeStr, 'utf8', function () {}); 
-  })
+    fs.writeFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, routeStr, 'utf8', function () { });
+  });
 
   let tmp = new Set();
   flows.forEach((f) => {
@@ -306,20 +359,20 @@ function extractPatternInSubfolders(folderPath: string): LooseObject {
       !file.name.startsWith(".")
     ) {
       const counts = extractPatterns(filePath);
-      if(Object.keys(counts).length) {
+      if (Object.keys(counts).length) {
         subfolderCounts[filePath] = counts;
       }
     } else if (file.isDirectory() && !file.name.startsWith(".")) {
       // Recursively search for Python files in subdirectories
       const deeperCounts = extractPatternInSubfolders(filePath);
-      if ( Object.keys(deeperCounts).length) {
+      if (Object.keys(deeperCounts).length) {
         subfolderCounts[filePath] = deeperCounts;
       }
     }
   });
 
   // flatten hierarchy attempt
-  if(Object.keys(subfolderCounts).length === 1) {
+  if (Object.keys(subfolderCounts).length === 1) {
     return subfolderCounts[Object.keys(subfolderCounts)[0]];
   }
   return subfolderCounts;
@@ -333,26 +386,26 @@ function flattenRFF(endPoints: LooseObject): [LooseObject[], LooseObject[], Loos
   for (const key of Object.keys(flat)) {
     const sp = key.split('.');
     if (sp[sp.length - 1] === 'routes') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+      for (let i = 0; i < flat[key].length; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.') };
         routes.push(newObject);
       }
     }
     else if (sp[sp.length - 1] === 'flowStart') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+      for (let i = 0; i < flat[key].length; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.') };
         flows.push(newObject);
       }
     }
     else if (sp[sp.length - 1] === 'flowEnd') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+      for (let i = 0; i < flat[key].length; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.') };
         flows.push(newObject);
       }
     }
     else if (sp[sp.length - 1] === 'funcs') {
-      for (let i = 0; i < flat[key].length ; ++i) {
-        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.')};
+      for (let i = 0; i < flat[key].length; ++i) {
+        const newObject = { ...flat[key][i], file: sp.slice(0, sp.length - 1).join('.') };
         funcs.push(newObject);
       }
     }
@@ -389,16 +442,16 @@ function findNearestVirtualEnv(pathToCheck: string): string {
   let maxIter = 50;
 
   while (currentPath !== path.parse(currentPath).root && maxIter > 0) {
-      const pythonBinPath = process.platform === 'win32'
+    const pythonBinPath = process.platform === 'win32'
       ? path.join(currentPath, '.venv', 'Scripts', 'python.exe')
       : path.join(currentPath, 'venv', 'bin', 'python');
 
-      if (fs.existsSync(pythonBinPath)) {
-          return pythonBinPath;
-      }
+    if (fs.existsSync(pythonBinPath)) {
+      return pythonBinPath;
+    }
 
-      currentPath = path.dirname(currentPath);
-      maxIter -= 1;
+    currentPath = path.dirname(currentPath);
+    maxIter -= 1;
   }
 
   // If no virtual environment found, set pythonBinPath to the global python interpreter
@@ -420,8 +473,8 @@ function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: L
     }
 
     var workspacePath: string = vscode.workspace.workspaceFolders
-    ? vscode.workspace.workspaceFolders[0].uri.fsPath
-    : "";
+      ? vscode.workspace.workspaceFolders[0].uri.fsPath
+      : "";
 
     let pythonPath = "";
 
@@ -431,9 +484,9 @@ function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: L
       pythonPath = findNearestVirtualEnv(workspacePath);
     }
 
-    const pythonScriptPath = vscode.Uri.joinPath(extensionUri, "src", "walk_from_func.py"); // Update with your script's path
+    const pythonScriptPath = vscode.Uri.joinPath(extensionUri, "src", "walk_from_func.py");
     const endP = JSON.stringify(endPoints);
-    
+
     // // Consider if argument size gets too large
     // console.log(endP.length);
     // const comp = zlib.gzipSync(endP).toString('base64');
@@ -441,9 +494,8 @@ function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: L
     var output: string[] = [];
     var errors: string[] = [];
 
-    // Run the Python script with the JSON argument
     const pythonProcess = child_process.spawn(pythonPath, [pythonScriptPath.fsPath, flow.file, flow.func, endP]);
-    
+
     pythonProcess.stdout.on("data", (data: any) => {
       console.log(data.toString());
       output.push(data);
@@ -465,105 +517,105 @@ function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: L
 }
 
 export function createGraph(context: vscode.ExtensionContext, flowName: string | undefined = undefined, refresh: boolean = false) {
-    let allFlows: LooseObject[] = context.globalState.get("flows") || [];
-    let routes:  LooseObject[] = context.globalState.get("routes") || [];
-    let funcs: LooseObject[] = context.globalState.get("funcs") || [];
-    let graphs: LooseObject = context.globalState.get("graphs") || {};
+  let allFlows: LooseObject[] = context.globalState.get("flows") || [];
+  let routes: LooseObject[] = context.globalState.get("routes") || [];
+  let funcs: LooseObject[] = context.globalState.get("funcs") || [];
+  let graphs: LooseObject = context.globalState.get("graphs") || {};
 
-    if (refresh) {
-      [routes, allFlows, funcs] = extractRFF(context);
-    }
+  if (refresh) {
+    [routes, allFlows, funcs] = extractRFF(context);
+  }
 
-    if (allFlows.length === 0) {
+  if (allFlows.length === 0) {
+    throw new Error("how");
+  }
+
+  let flows: LooseObject[] = [];
+
+  if (flowName !== undefined) {
+    let flow = allFlows.find((el) => el.name === flowName);
+
+    if (flow === undefined) {
       throw new Error("how");
     }
 
-    let flows: LooseObject[] = [];
+    // generate this graph
+    flows = [flow];
+  }
+  else {
+    // generate all graphs
+    flows = allFlows;
+  }
 
-    if (flowName !== undefined) {
-      let flow = allFlows.find((el) => el.name === flowName);
 
-      if (flow === undefined) {
-        throw new Error("how");
-      }
+  for (let i = 0; i < flows.length; ++i) {
+    const graphView = new GraphView(context);
+    const flowName = flows[i].name;
 
-      // generate this graph
-      flows = [flow];
+    // check if graph is in memory
+    if (!refresh && graphs[flowName]) {
+      const data = graphs[flowName];
+      graphView.showGraph(data, flowName);
+      continue;
     }
-    else {
-      // generate all graphs
-      flows = allFlows;
-    }
 
-
-    for(let i = 0 ; i< flows.length ; ++i) {
-      const graphView = new GraphView(context);
-      const flowName = flows[i].name;
-
-      // check if graph is in memory
-      if (!refresh && graphs[flowName]) {
-        const data = graphs[flowName];
-        graphView.showGraph(data, flowName);
-        continue;
+    runPythonProg(context.extensionUri, flows[i], routes).then((result) => {
+      if (result.errors.length) {
+        result.errors.forEach(err => console.error(err));
+        vscode.window.showErrorMessage(`Graph generation for flow '${flowName}' failed`);
+        throw new Error();
       }
-      
-      runPythonProg(context.extensionUri, flows[i], routes).then((result) => {
-        if (result.errors.length) {
-          result.errors.forEach(err => console.error(err));
-          vscode.window.showErrorMessage(`Graph generation for flow '${flowName}' failed`);
-          throw new Error();
-        }
-        if (result.outputs.length !== 1) {
-          throw new Error("too much python output");
-        }
-        const data = JSON.parse(result.outputs[0]);
-        // match graph funcs with extracted funcs
-        for (let id in data.graph.nodes) {
-          let node = data.graph.nodes[id];
+      if (result.outputs.length !== 1) {
+        throw new Error("too much python output");
+      }
+      const data = JSON.parse(result.outputs[0]);
+      // match graph funcs with extracted funcs
+      for (let id in data.graph.nodes) {
+        let node = data.graph.nodes[id];
 
-          // Node is a http call
-          let unknownNode = false;
+        // Node is a http call
+        let unknownNode = false;
 
-          if (node.is_route) {
-            const route = routes.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func_name === node.func_name);
-            if (route.length) {
-              node.lineno = route[0].lineno;
-              node.project_path = route[0].project_path;
-              node.project_color = route[0].project_color;
-            }
-            else {
-              unknownNode = true;
-            }
+        if (node.is_route) {
+          const route = routes.filter((endPoint) => pathsAreEqual(endPoint.file, node.file) && endPoint.func_name === node.func_name);
+          if (route.length) {
+            node.lineno = route[0].lineno;
+            node.project_path = route[0].project_path;
+            node.project_color = route[0].project_color;
           }
-          // Node is a function call
           else {
-            const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
-            // TODO: remove if condition, dummy check
-            if (func.length) {
-              node.lineno = func[0].lineno;
-              node.project_path = func[0].project_path;
-              node.project_color = func[0].project_color;
-            }
-            else {
-              unknownNode = true;
-            }
-          }
-          if (unknownNode) {
-            node.lineno = 0;
-            node.project_path = "dummy";
-            node.project_color = "#ff0000"; // red
+            unknownNode = true;
           }
         }
+        // Node is a function call
+        else {
+          const func = funcs.filter((func) => pathsAreEqual(func.file, node.file) && func.name === node.func_name);
+          // TODO: remove if condition, dummy check
+          if (func.length) {
+            node.lineno = func[0].lineno;
+            node.project_path = func[0].project_path;
+            node.project_color = func[0].project_color;
+          }
+          else {
+            unknownNode = true;
+          }
+        }
+        if (unknownNode) {
+          node.lineno = 0;
+          node.project_path = "dummy";
+          node.project_color = "#ff0000";
+        }
+      }
 
-        if (refresh || !graphs[flowName]) {
-          graphs[flowName] = data;
-          context.globalState.update("graphs", graphs);
-        }
-        graphView.showGraph(data, flowName);
-      })
+      if (refresh || !graphs[flowName]) {
+        graphs[flowName] = data;
+        context.globalState.update("graphs", graphs);
+      }
+      graphView.showGraph(data, flowName);
+    })
       .catch((error) => {
         vscode.window.showErrorMessage(`Graph generation failed: ${error}`);
         console.error('Error:', error);
       });
-    }
+  }
 }

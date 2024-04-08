@@ -1,18 +1,15 @@
 // @ts-nocheck
 
-// This script will be run within the webview itself
-// It cannot access the main VS Code APIs directly.
 (function () {
     const vscode = acquireVsCodeApi();
 
-    // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
-        const message = event.data; // The json data that the extension sent
+        const message = event.data;
         switch (message.command) {
             case 'updateMaintainers':
                 {
                     console.log('updateMaintainers', message);
-                    updateMaintainersTable(message.activeFilePath, message.maintainers);
+                    updateMaintainersTable(message.maintainerMapPath, message.activeFilePath, message.maintainers);
                     break;
                 }
         }
@@ -23,12 +20,7 @@
         vscode.postMessage({ command: 'openFile', filePath, lineno});
     }
 
-    function createGraph(flowName, refresh = false) {
-        console.log("createGraph", flowName, refresh);
-        vscode.postMessage({ command: 'createGraph', flowName, refresh});
-    }
-
-    function updateMaintainersTable(filepath, maintainers) {
+    function updateMaintainersTable(maintainerMapPath, filepath, maintainers) {
         let infoParagraph = document.querySelector('#info_help');
         infoParagraph.textContent = "";
 
@@ -44,12 +36,23 @@
         let filepathSplit = filepath.split('\\');
         let filename = filepathSplit[filepathSplit.length - 1];
         title.textContent = "Maintainers of " + filename;
+
+        let maintainerMapPathSplit = maintainerMapPath.split('\\');
+        let maintainerMapFilename = maintainerMapPathSplit[maintainerMapPathSplit.length - 1];
         
         if (maintainers.length === 0) {
             // no maintainers, display help message
             let tr = document.createElement("tr");
             let p = document.createElement("p");
-            p.innerHTML = "No maintainers detected for this file. If you would like to maintain this file, then add/edit your entry in codeMaintainerMap.json";
+
+            let a = document.createElement("a");
+            a.innerText = maintainerMapFilename;
+            a.title = maintainerMapFilename;
+            a.href = '#';
+            a.addEventListener('click', () => openFile(maintainerMapPath, 1));
+
+            p.innerHTML = "No maintainers detected for this file. If you would like to maintain this file, then add/edit your entry in ";
+            p.appendChild(a);
             tr.appendChild(p);
             table.appendChild(tr);
             return;

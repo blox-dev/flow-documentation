@@ -136,7 +136,6 @@ export class GraphView {
       vscode.Uri.joinPath(this._extensionUri, "media", "graph.js")
     );
 
-    // Use a nonce to only allow a specific script to be run.
     const nonce = getNonce();
 
     let xd = `<!DOCTYPE html>

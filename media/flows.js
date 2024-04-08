@@ -1,7 +1,5 @@
 // @ts-nocheck
 
-// This script will be run within the webview itself
-// It cannot access the main VS Code APIs directly.
 (function () {
     const vscode = acquireVsCodeApi();
 
@@ -9,9 +7,8 @@
         vscode.postMessage({ command: 'fetchFlows'});
     });
 
-    // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
-        const message = event.data; // The json data that the extension sent
+        const message = event.data;
         switch (message.command) {
             case 'updateFlows':
                 {
@@ -33,7 +30,7 @@
     }
 
     function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
       
     function replaceAll(str, find, replace) {
