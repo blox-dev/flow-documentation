@@ -10,7 +10,7 @@ export function pathsAreEqual(path1: string, path2: string) {
     return path1 === path2;
 }
 
-function escapeRegExp(string: string) {
+export function escapeRegExp(string: string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
   

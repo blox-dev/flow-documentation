@@ -17,7 +17,7 @@
 
     function openFile(filePath, lineno) {
         console.log("openFile", filePath, lineno);
-        vscode.postMessage({ command: 'openFile', filePath, lineno});
+        vscode.postMessage({ command: 'openFile', filePath, lineno });
     }
 
     function updateMaintainersTable(maintainerMapPath, filepath, maintainers) {
@@ -39,7 +39,7 @@
 
         let maintainerMapPathSplit = maintainerMapPath.split('\\');
         let maintainerMapFilename = maintainerMapPathSplit[maintainerMapPathSplit.length - 1];
-        
+
         if (maintainers.length === 0) {
             // no maintainers, display help message
             let tr = document.createElement("tr");
@@ -59,28 +59,32 @@
         }
 
         maintainers.forEach((maintainer) => {
+            console.log(maintainer);
             let tr = document.createElement("tr");
             tr.className = "maintainer-entry";
 
             let p = document.createElement("p");
-            p.innerText = maintainer.name + " / " + maintainer.email + " / " + maintainer.phone;
+            p.innerText = maintainer.name + ": " + maintainer.maintains.path;
 
             tr.appendChild(p);
             table.appendChild(tr);
 
             for (const [key, value] of Object.entries(maintainer)) {
-                if (key === "name") {
+                if (["name", "maintains"].includes(key)) {
+                    continue;
+                }
+                if (!value || (key === "_old" && value.length === 0)) {
                     continue;
                 }
                 let tr = document.createElement("tr");
                 tr.className = "maintainer-entry";
-                
+
                 let p = document.createElement("p");
                 p.innerText = "\t> " + key + ": " + value;
 
                 tr.appendChild(p);
                 table.appendChild(tr);
             }
-		});
+        });
     }
 }());

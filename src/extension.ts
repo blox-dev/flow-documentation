@@ -7,7 +7,7 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { FlowsViewProvider } from "./flowsView";
 import { MaintainersViewProvider } from "./maintainersview";
-import { pathsAreEqual } from "./utils";
+import { pathsAreEqual, escapeRegExp } from "./utils";
 import { GraphView } from "./graphview";
 // import * as zlib from 'zlib';
 
@@ -131,6 +131,28 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  const disposable3 = vscode.commands.registerCommand(
+    "flow-documentation.chooseMaintainerFile",
+    () => {
+      vscode.window.showOpenDialog({
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        filters: {
+          'JSON files': ['json']
+        }
+      }).then(fileUri => {
+        if (fileUri && fileUri[0]) {
+          const chosenJsonFilePath = fileUri[0].fsPath;
+          // Save chosen JSON file path in global context
+          context.globalState.update('codeMaintainerMapPath', chosenJsonFilePath);
+          vscode.window.showInformationMessage('JSON file located and saved');
+        }
+      });
+
+    }
+  );
+
   context.subscriptions.push(disposable);
   context.subscriptions.push(disposable2);
 }
@@ -138,16 +160,44 @@ export function activate(context: vscode.ExtensionContext) {
 function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject[] {
 
   var maintainers: LooseObject[] = [];
+  var nActiveFilePath = path.normalize(activeFilePath);
 
   for (var i = 0; i < codeMaintainerMap.length; ++i) {
     const code = codeMaintainerMap[i].maintains;
     for (var j = 0; j < code.length; ++j) {
-      const index = path.normalize(activeFilePath).indexOf(path.normalize(code[j].path));
+      const nCodePath = path.normalize(code[j].path);
+
+      if(code[j].regex && code[j].regex === true) {
+        // try regex matching on the path
+        const reg = new RegExp(escapeRegExp(nCodePath), 'gi');
+        if (reg.test(nActiveFilePath)) {
+          var obj = Object.assign({}, codeMaintainerMap[i].contact);
+          obj.maintains = code[j];
+          console.log(obj);
+          maintainers.push(obj);
+          break;
+        }
+      }
+
+      const index = nActiveFilePath.indexOf(nCodePath);
       if (index === -1) {
         continue;
       }
-      console.log(codeMaintainerMap[i].contact);
-      maintainers.push(codeMaintainerMap[i].contact);
+      if (index + nCodePath.length !== nActiveFilePath.length) {
+        // the active filepath does not end with the code path
+        var illegalPathCharacters = ['/'];
+        if (process.platform === "win32") {
+          illegalPathCharacters = ['/', '\\', '<', '>', ':', '"', '|', '?', '*'];
+        }
+        if (!illegalPathCharacters.includes(nActiveFilePath[index + nCodePath.length])) {
+          // the next character should not be part of the folder name, but a folder delimitator
+          continue;
+        }
+      }
+      var obj = Object.assign({}, codeMaintainerMap[i].contact);
+      obj.maintains = code[j];
+      console.log(obj);
+      maintainers.push(obj);
       break;
     }
   }
