@@ -2,24 +2,7 @@ body {
 	background-color: transparent;
 }
 
-.maintainer-list {
-	list-style: none;
-	padding: 0;
-}
-
-.maintainer-entry {
-	width: 100%;
-	display: flex;
-	margin-bottom: 0.4em;
-	border: 1px solid var(--vscode-input-border);
-}
-
-.maintainer-input {
-	display: block;
-	flex: 1;
-	width: 100%;
-	color: var(--vscode-input-foreground);
-	background-color: var(--vscode-input-background);
-	border: none;
-	padding: 0 0.6em;
+.ui-state-active {
+	border: 1px solid #59b4d4 !important;
+    background:#0078a3 url("images/ui-bg_inset-soft_30_f58400_1x100.png") 50% 50% repeat-x !important;
 }

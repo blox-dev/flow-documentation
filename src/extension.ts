@@ -123,7 +123,7 @@ export function activate(context: vscode.ExtensionContext) {
             console.log("Invalid json config");
           }
           var activeFilePath = thisFilePath?.fsPath || "";
-          const maintainers: LooseObject[] = findMaintainers(activeFilePath, codeMaintainerMap);
+          const maintainers: LooseObject = findMaintainers(activeFilePath, codeMaintainerMap);
 
           maintainersViewProvider.displayMaintainers(codeMaintainerMapPath || "", activeFilePath, maintainers);
         }
@@ -158,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable3);
 }
 
-function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject[] {
+function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject {
 
   var maintainers: LooseObject[] = [];
   var nActiveFilePath = path.normalize(activeFilePath);
@@ -172,10 +172,7 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
         // try regex matching on the path
         const reg = new RegExp(escapeRegExp(nCodePath), 'gi');
         if (reg.test(nActiveFilePath)) {
-          var obj = Object.assign({}, codeMaintainerMap[i].contact);
-          obj.maintains = code[j];
-          console.log(obj);
-          maintainers.push(obj);
+          maintainers.push({"contact": codeMaintainerMap[i].contact, "code": code[j]});
           break;
         }
       }
@@ -195,14 +192,22 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
           continue;
         }
       }
-      var obj = Object.assign({}, codeMaintainerMap[i].contact);
-      obj.maintains = code[j];
-      console.log(obj);
-      maintainers.push(obj);
-      break;
+      maintainers.push({"contact": codeMaintainerMap[i].contact, "code": code[j]});
     }
   }
-  return maintainers;
+  // prepare maintainers
+  let codeMap: LooseObject = {};
+
+  for (let i=0 ; i<maintainers.length ; ++i) {
+    const {contact, code} = maintainers[i];
+    if (!(code.path in codeMap)) {
+      codeMap[code.path] = {"code": code, "maintainer": [contact]};
+    } else {
+      codeMap[code.path].maintainer.push(contact);
+    }
+  }
+
+  return codeMap;
 }
 
 // This method is called when your extension is deactivated

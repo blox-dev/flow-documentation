@@ -45,7 +45,7 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
-	public displayMaintainers(maintainerMapPath: string, activeFilePath: string, maintainers: LooseObject[]) {
+	public displayMaintainers(maintainerMapPath: string, activeFilePath: string, maintainers: LooseObject) {
 		this._view?.webview.postMessage({ command: 'updateMaintainers', maintainers: maintainers, activeFilePath: activeFilePath, maintainerMapPath: maintainerMapPath });
 	}
 

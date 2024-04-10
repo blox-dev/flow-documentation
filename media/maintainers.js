@@ -54,7 +54,7 @@
         let maintainerMapPathSplit = maintainerMapPath.split('\\');
         let maintainerMapFilename = maintainerMapPathSplit[maintainerMapPathSplit.length - 1];
 
-        if (maintainers.length === 0) {
+        if (Object.keys(maintainers).length === 0) {
             // no maintainers, display help message
             let p = document.createElement("p");
 
@@ -74,42 +74,49 @@
         let maintainerAccordionDiv = document.createElement("div");
         maintainerAccordionDiv.classList.add("accordion");
 
-        maintainers.forEach((maintainer) => {
-            console.log(maintainer);
+        // order paths by most to least specific (longest string to shortest)
+        let codePaths = Object.keys(maintainers);
+        codePaths.sort((a, b) => b.length - a.length);
 
+        for (let codeIndex = 0; codeIndex < codePaths.length ; codeIndex ++) {
+            let codePath = codePaths[codeIndex];
+            let code = maintainers[codePath].code;
+            let maintainerList = maintainers[codePath].maintainer;
             let codeHeader = document.createElement("h2"); // <h3>addons/account</h3>
-            codeHeader.innerText = maintainer.maintains.path + ((maintainer.maintains.regex && maintainer.maintains.regex === true) ? " (regex)" : "");
+            codeHeader.innerText = codePath + ((code.regex && code.regex === true) ? " (regex)" : "");
 
             let maintainerDiv = document.createElement("div"); // <div>
             maintainerDiv.classList.add("accordion");
 
-            let maintainerHeader = document.createElement("h2"); // <h3>William</h3>
-            maintainerHeader.innerHTML = maintainer.name;
-
-            let maintainerContactDiv = document.createElement("div"); // <div>
-
-            for (const [key, value] of Object.entries(maintainer)) {
-                if (["name", "maintains"].includes(key)) {
-                    continue;
+            for (let i = 0 ; i < maintainerList.length ; ++i) {
+                const maintainer = maintainerList[i];
+                
+                let maintainerHeader = document.createElement("h2"); // <h3>William</h3>
+                maintainerHeader.innerHTML = maintainer.name;
+    
+                let maintainerContactDiv = document.createElement("div"); // <div>
+    
+                for (const [key, value] of Object.entries(maintainer)) {
+                    if (["name", "maintains"].includes(key)) {
+                        continue;
+                    }
+                    if (!value || (key === "_old" && value.length === 0)) {
+                        continue;
+                    }
+                    let p = document.createElement("p");
+                    p.innerText = "\t> " + key + ": " + value;
+    
+                    maintainerContactDiv.appendChild(p);
                 }
-                if (!value || (key === "_old" && value.length === 0)) {
-                    continue;
-                }
-                let p = document.createElement("p");
-                p.innerText = "\t> " + key + ": " + value;
-
-                maintainerContactDiv.appendChild(p);
+                maintainerDiv.appendChild(maintainerHeader);
+                maintainerDiv.appendChild(maintainerContactDiv);
             }
-            // </div>
-
-            maintainerDiv.appendChild(maintainerHeader);
-            maintainerDiv.appendChild(maintainerContactDiv);
 
             // </div>
 
             maintainerAccordionDiv.appendChild(codeHeader);
             maintainerAccordionDiv.appendChild(maintainerDiv);
-        });
+        };
 
         // attach and run accordion
         maintainerCodePathDiv.appendChild(maintainerAccordionDiv);
