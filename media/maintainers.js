@@ -24,12 +24,26 @@
         let infoParagraph = document.querySelector('#info_help');
         infoParagraph.textContent = "";
 
-        let table = document.querySelector('#maintainer-table');
+        let maintainerCodePathDiv = document.querySelector('#maintainer-div');
 
-        // remove all existing maintainers
-        while (table.firstChild) {
-            table.removeChild(table.firstChild);
+        // recursively remove all existing maintainers
+        // https://stackoverflow.com/a/32261977
+
+        function clearInner(node) {
+            while (node.hasChildNodes()) {
+                clear(node.firstChild);
+            }
         }
+          
+        function clear(node) {
+            while (node.hasChildNodes()) {
+                clear(node.firstChild);
+            }
+            node.parentNode.removeChild(node);
+        }
+          
+        clearInner(maintainerCodePathDiv);
+
 
         let title = document.querySelector('#maintainer-title');
 
@@ -42,7 +56,6 @@
 
         if (maintainers.length === 0) {
             // no maintainers, display help message
-            let tr = document.createElement("tr");
             let p = document.createElement("p");
 
             let a = document.createElement("a");
@@ -53,21 +66,27 @@
 
             p.innerHTML = "No maintainers detected for this file. If you would like to maintain this file, then add/edit your entry in ";
             p.appendChild(a);
-            tr.appendChild(p);
-            table.appendChild(tr);
+            maintainerCodePathDiv.appendChild(p);
             return;
         }
 
+        // there is at least one maintainer, create accordion
+        let maintainerAccordionDiv = document.createElement("div");
+        maintainerAccordionDiv.classList.add("accordion");
+
         maintainers.forEach((maintainer) => {
             console.log(maintainer);
-            let tr = document.createElement("tr");
-            tr.className = "maintainer-entry";
 
-            let p = document.createElement("p");
-            p.innerText = maintainer.name + ": " + maintainer.maintains.path;
+            let codeHeader = document.createElement("h2"); // <h3>addons/account</h3>
+            codeHeader.innerText = maintainer.maintains.path + ((maintainer.maintains.regex && maintainer.maintains.regex === true) ? " (regex)" : "");
 
-            tr.appendChild(p);
-            table.appendChild(tr);
+            let maintainerDiv = document.createElement("div"); // <div>
+            maintainerDiv.classList.add("accordion");
+
+            let maintainerHeader = document.createElement("h2"); // <h3>William</h3>
+            maintainerHeader.innerHTML = maintainer.name;
+
+            let maintainerContactDiv = document.createElement("div"); // <div>
 
             for (const [key, value] of Object.entries(maintainer)) {
                 if (["name", "maintains"].includes(key)) {
@@ -76,15 +95,30 @@
                 if (!value || (key === "_old" && value.length === 0)) {
                     continue;
                 }
-                let tr = document.createElement("tr");
-                tr.className = "maintainer-entry";
-
                 let p = document.createElement("p");
                 p.innerText = "\t> " + key + ": " + value;
 
-                tr.appendChild(p);
-                table.appendChild(tr);
+                maintainerContactDiv.appendChild(p);
             }
+            // </div>
+
+            maintainerDiv.appendChild(maintainerHeader);
+            maintainerDiv.appendChild(maintainerContactDiv);
+
+            // </div>
+
+            maintainerAccordionDiv.appendChild(codeHeader);
+            maintainerAccordionDiv.appendChild(maintainerDiv);
+        });
+
+        // attach and run accordion
+        maintainerCodePathDiv.appendChild(maintainerAccordionDiv);
+
+        $(".accordion").accordion({
+            header: "> h2:not(.item)",
+            heightStyle: "content",
+            active: false,
+            collapsible: true
         });
     }
 }());

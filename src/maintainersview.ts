@@ -52,10 +52,12 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 	private _getHtmlForWebview(webview: vscode.Webview) {
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.js'));
 		const jquerySrc = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "lib", "jquery.min.js"));
+		const jqueryUISrc = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "lib", "jquery-ui.min.js"));
 
 		const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css'));
 		const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css'));
 		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'maintainers.css'));
+		const stylejqueryUI = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "lib", "jquery-ui.min.css"));
 
 		const nonce = getNonce();
 
@@ -75,6 +77,9 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 				<script nonce="${nonce}" src="${jquerySrc}"></script>
+				<script nonce="${nonce}" src="${jqueryUISrc}"></script>
+				<link href="${stylejqueryUI}" rel="stylesheet">
+
 				<link href="${styleResetUri}" rel="stylesheet">
 				<link href="${styleVSCodeUri}" rel="stylesheet">
 				<link href="${styleMainUri}" rel="stylesheet">
@@ -88,7 +93,7 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 
 				<h1 id="maintainer-title"></h1>
 
-				<table id="maintainer-table" class="maintainer-list"></table>
+				<div id="maintainer-div"></div>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>
 			</body>
