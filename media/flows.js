@@ -4,7 +4,7 @@
     const vscode = acquireVsCodeApi();
 
     document.querySelector('.fetch-flows-button').addEventListener('click', () => {
-        vscode.postMessage({ command: 'fetchFlows'});
+        vscode.postMessage({ command: 'fetchFlows' });
     });
 
     window.addEventListener('message', event => {
@@ -21,18 +21,18 @@
 
     function openFile(filePath, lineno) {
         console.log("openFile", filePath, lineno);
-        vscode.postMessage({ command: 'openFile', filePath, lineno});
+        vscode.postMessage({ command: 'openFile', filePath, lineno });
     }
 
     function createGraph(flowName, refresh = false) {
         console.log("createGraph", flowName, refresh);
-        vscode.postMessage({ command: 'createGraph', flowName, refresh});
+        vscode.postMessage({ command: 'createGraph', flowName, refresh });
     }
 
     function escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
-      
+
     function replaceAll(str, find, replace) {
         return str.replace(new RegExp(escapeRegExp(find), 'g'), replace);
     }
@@ -44,7 +44,7 @@
         while (table.firstChild) {
             table.removeChild(table.firstChild);
         }
-        
+
         if (flows.length === 0) {
             // no flows, display help message
             let tr = document.createElement("tr");
@@ -56,8 +56,8 @@
         }
 
         flows.forEach((flow) => {
-			const flowFile = replaceAll(flow.file, '\\', '/');
-			const flowName = replaceAll(flow.name, '\\', '/');
+            const flowFile = replaceAll(flow.file, '\\', '/');
+            const flowName = replaceAll(flow.name, '\\', '/');
             let tr = document.createElement("tr");
             tr.className = "flow-entry";
             let td = document.createElement("td");
@@ -89,6 +89,6 @@
 
             tr.appendChild(td);
             table.appendChild(tr);
-		});
+        });
     }
 }());

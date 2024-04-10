@@ -58,11 +58,11 @@
     console.log("----------- nodes ------------");
     console.log(nodeData);
     updateNodes(nodeData);
-    
+
     console.log("----------- edges ------------");
     console.log(edgeData);
     updateEdges(nodeData, edgeData);
-    
+
     const affList = document.querySelector(".affected-files-list");
     while (affList.firstChild) {
       affList.removeChild(affList.firstChild);
@@ -222,7 +222,7 @@
           var openFunc = document.getElementById("open-func");
           openFunc.style.display = "none";
           openFunc.onclick = null;
-          
+
           if (edggge.hasBreakpoint) {
             var addBrkCall = document.getElementById("add-brk-call");
             addBrkCall.style.display = "none";
@@ -233,7 +233,7 @@
             remBrkCall.onclick = function (e) {
               e.preventDefault();
 
-              removeBreakpoint(sn.file, callLines.map(function (elem) {return elem - 1;}));
+              removeBreakpoint(sn.file, callLines.map(function (elem) { return elem - 1; }));
               edggge.hasBreakpoint = false;
               updateEdges(nodeData, edgeData);
             };
@@ -243,7 +243,7 @@
             addBrkCall.onclick = function (e) {
               e.preventDefault();
 
-              addBreakpoint(sn.file, callLines.map(function (elem) {return elem - 1;}));
+              addBreakpoint(sn.file, callLines.map(function (elem) { return elem - 1; }));
               edggge.hasBreakpoint = true;
               updateEdges(nodeData, edgeData);
             };

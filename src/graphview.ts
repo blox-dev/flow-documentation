@@ -24,7 +24,7 @@ export class GraphView {
     );
     this._view = panel.webview;
 
-    panel.webview.html = this._getHtmlForWebview(panel.webview, data);
+    panel.webview.html = this._getHtmlForWebview(panel.webview);
 
     panel.webview.onDidReceiveMessage((message) => {
       switch (message.command) {
@@ -41,7 +41,7 @@ export class GraphView {
 
             let breakP = breakPoints.filter((bp) => {
               return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, startNode.file) &&
-              edge.call_lines.includes(bp.location?.range.start.line + 1);
+                edge.call_lines.includes(bp.location?.range.start.line + 1);
             });
 
             edge.hasBreakpoint = breakP.length === edge.call_lines.length;
@@ -63,9 +63,9 @@ export class GraphView {
             // match possible breakpoint
             let breakP = breakPoints.filter((bp) => {
               return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, node.file) &&
-              node.lineno === bp.location?.range.start.line - 1;
+                node.lineno === bp.location?.range.start.line - 1;
             });
-            
+
             node.hasBreakpoint = breakP.length !== 0 ? true : false;
 
             if (affectedFiles.has(node.file)) {
@@ -113,7 +113,7 @@ export class GraphView {
           const brkp = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
           const toRemove = brkp.filter((bp) => {
             return pathsAreEqual(vscode.Uri.file(bp.location?.uri.path).fsPath, message.filePath) &&
-            linenos.includes(bp.location?.range.start.line);
+              linenos.includes(bp.location?.range.start.line);
           });
           vscode.debug.removeBreakpoints(toRemove);
           break;
@@ -122,33 +122,28 @@ export class GraphView {
     });
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview, data: LooseObject) {
-    const mermaidSrc = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "lib", "mermaid.min.js")
-    );
-    const jquerySrc = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "lib", "jquery.min.js")
-    );
-    const graphStyleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media", "graph.css")
-    );
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media", "graph.js")
-    );
+  private _getHtmlForWebview(webview: vscode.Webview) {
+    const mermaidSrc = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "lib", "mermaid.min.js"));
+    const jquerySrc = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "lib", "jquery.min.js"));
+    const graphStyleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "graph.css"));
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "graph.js"));
 
     const nonce = getNonce();
 
     let xd = `<!DOCTYPE html>
-      <html>
+      <html lang="en">
           <head>
-            <script src="${mermaidSrc}"></script>
-            <script src="${jquerySrc}"></script>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+            <script nonce="${nonce}" src="${mermaidSrc}"></script>
+            <script nonce="${nonce}" src="${jquerySrc}"></script>
             <link href="${graphStyleUri}" rel="stylesheet">
         </head>
         <body>
           
-          <div style="display:flex; flex-direction:row">
-            <div id="mermaidGraph" style="width:50%">
+          <div id="mermaidDiv">
+            <div id="mermaidGraph">
               Loading...
             </div>
       

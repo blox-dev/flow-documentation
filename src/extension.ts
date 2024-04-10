@@ -167,7 +167,7 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
     for (var j = 0; j < code.length; ++j) {
       const nCodePath = path.normalize(code[j].path);
 
-      if(code[j].regex && code[j].regex === true) {
+      if (code[j].regex && code[j].regex === true) {
         // try regex matching on the path
         const reg = new RegExp(escapeRegExp(nCodePath), 'gi');
         if (reg.test(nActiveFilePath)) {

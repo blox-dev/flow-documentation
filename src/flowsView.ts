@@ -57,7 +57,7 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 
 	public fetchFlows() {
 		const [_endP, flows, _funcs] = extractRFF(this._context);
-		this._view?.webview.postMessage({command: 'updateFlows', flows: flows});
+		this._view?.webview.postMessage({ command: 'updateFlows', flows: flows });
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
