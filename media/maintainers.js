@@ -137,7 +137,7 @@
 
         if (Object.keys(maintainers).length === 0) {
             // no maintainers, display help message
-            let p = document.createElement("p");
+            let h3 = document.createElement("h3");
 
             let a = document.createElement("a");
             a.innerText = maintainerMapFilename;
@@ -145,9 +145,9 @@
             a.href = '#';
             a.addEventListener('click', () => openFile(maintainerMapPath, 1));
 
-            p.innerHTML = "No maintainers detected for this file. If you would like to maintain this file, then add/edit your entry in ";
-            p.appendChild(a);
-            maintainerCodePathDiv.appendChild(p);
+            h3.innerHTML = "No maintainers detected for this file. If you would like to maintain this file, then add/edit your entry in ";
+            h3.appendChild(a);
+            maintainerCodePathDiv.appendChild(h3);
             return;
         }
 

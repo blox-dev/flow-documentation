@@ -127,9 +127,9 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 				<title>Flow Documentation</title>
 			</head>
 			<body>
-				<p id="info_help">
+				<h3 id="info_help">
 					Right click on a file or folder and select <b>Show Maintainer</b> to open the list of active maintainers.
-				</p>
+				</h3>
 
 				<div id="most-active-maintainer-div"></div>
 
