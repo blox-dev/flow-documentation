@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { LooseObject } from './extension';
 import { openFile } from './utils';
+import * as fs from "fs";
 
 export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 
@@ -13,6 +14,7 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 	constructor(
 		private _context: vscode.ExtensionContext,
 	) {
+		this._context = _context;
 		this._extensionUri = _context.extensionUri;
 	}
 
@@ -28,11 +30,12 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 
 			localResourceRoots: [
-				this._context.extensionUri
+				this._extensionUri
 			]
 		};
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+		this.displayMostActiveMaintainers(this._context);
 
 		webviewView.webview.onDidReceiveMessage(data => {
 			switch (data.command) {
@@ -43,6 +46,43 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 					}
 			}
 		});
+
+		webviewView.onDidChangeVisibility((ev) => {
+			if (webviewView.visible) {
+				// webview just opened or became visible, add default view of most active maintainers 
+				this.displayMostActiveMaintainers(this._context);
+			}
+		});
+	}
+
+	public displayMostActiveMaintainers(context: vscode.ExtensionContext) {
+		// vscode.window.showInformationMessage("Changed");
+		let codeMaintainerMapPath: string = context.globalState.get('codeMaintainerMapPath') || "";
+		fs.readFile(codeMaintainerMapPath, readFileCallback);
+		let that = this;
+		function readFileCallback(err: any, data: any) {
+			if (err) {
+				if (err.code === 'ENOENT') {
+					// file changed or renamed
+					return;
+				}
+				vscode.window.showErrorMessage(err.message);
+				return;
+			}
+			let codeMaintainerMap: LooseObject[] = [];
+
+			try {
+				codeMaintainerMap = JSON.parse(data.toString());
+			} catch {
+				console.log("Invalid json config");
+			}
+			codeMaintainerMap.sort((x, y) => y.maintains.length - x.maintains.length);
+
+			// just pick top 5 maintainers for now, maybe add "Show all" button later
+			codeMaintainerMap = codeMaintainerMap.slice(0, 5);
+
+			that._view?.webview.postMessage({ command: 'updateMostActiveMaintainers', map: codeMaintainerMap});
+		}
 	}
 
 	public displayMaintainers(maintainerMapPath: string, activeFilePath: string, maintainers: LooseObject) {
@@ -90,6 +130,8 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 				<p id="info_help">
 					Right click on a file or folder and select <b>Show Maintainer</b> to open the list of active maintainers.
 				</p>
+
+				<div id="most-active-maintainer-div"></div>
 
 				<h1 id="maintainer-title"></h1>
 

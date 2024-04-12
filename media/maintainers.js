@@ -12,6 +12,12 @@
                     updateMaintainersTable(message.maintainerMapPath, message.activeFilePath, message.maintainers);
                     break;
                 }
+            case 'updateMostActiveMaintainers':
+                {
+                    console.log('updateMostActiveMaintainers', message);
+                    updateMostActiveMaintainersTable(message.map);
+                    break;
+                }
         }
     });
 
@@ -20,27 +26,102 @@
         vscode.postMessage({ command: 'openFile', filePath, lineno });
     }
 
+    // recursively remove all inner nodes
+    // https://stackoverflow.com/a/32261977
+
+    function clearInner(node) {
+        while (node.hasChildNodes()) {
+            clear(node.firstChild);
+        }
+    }
+        
+    function clear(node) {
+        while (node.hasChildNodes()) {
+            clear(node.firstChild);
+        }
+        node.parentNode.removeChild(node);
+    }
+
+    function updateMostActiveMaintainersTable(maintainerMap) {
+        let infoParagraph = document.querySelector('#info_help');
+        infoParagraph.textContent += "Here are the most active maintainers of this repository";
+
+        let mostActiveMaintainerDiv = document.querySelector('#most-active-maintainer-div');
+        clearInner(mostActiveMaintainerDiv);
+        
+        let topAccordionDiv = document.createElement("div");
+        topAccordionDiv.classList.add("accordion");
+
+        for (let maintainerIndex = 0 ; maintainerIndex < maintainerMap.length ; maintainerIndex ++) {
+            let maintainer = maintainerMap[maintainerIndex];
+
+            let maintainerHeader = document.createElement("h2"); // <h2>William (12 maintained)</h2>
+            maintainerHeader.innerText = maintainer.contact.name + " (" + maintainer.maintains.length + " maintained)";
+
+            let maintainerAccordionDiv = document.createElement("div");
+            maintainerAccordionDiv.classList.add("accordion");
+
+            let maintainsHeader = document.createElement("h2"); // <h2>Maintained Code</h2>
+            maintainsHeader.innerText = "Maintained Code";
+
+            let maintainsDiv = document.createElement("div");
+
+            for (let codeIndex = 0 ; codeIndex < maintainer.maintains.length ; codeIndex ++) {
+                let code = maintainer.maintains[codeIndex];
+                
+                let p = document.createElement("p");
+                p.innerText = "> " + code.path + ((code.regex && code.regex === true) ? " (regex)" : "");
+                
+                maintainsDiv.appendChild(p);
+            }
+
+            let contactHeader = document.createElement("h2"); // <h2>Contact</h2>
+            contactHeader.innerText = "Contact";
+
+            let contactDiv = document.createElement("div");
+
+            // add contact information
+            for (const [key, value] of Object.entries(maintainer.contact)) {
+                if (["name", "maintains"].includes(key)) {
+                    continue;
+                }
+                if (!value || (key === "_old" && value.length === 0)) {
+                    continue;
+                }
+                let p = document.createElement("p");
+                p.innerText = "\t> " + key + ": " + value;
+
+                contactDiv.appendChild(p);
+            }
+
+            maintainerAccordionDiv.appendChild(maintainsHeader);
+            maintainerAccordionDiv.appendChild(maintainsDiv);
+
+            maintainerAccordionDiv.appendChild(contactHeader);
+            maintainerAccordionDiv.appendChild(contactDiv);
+
+            topAccordionDiv.appendChild(maintainerHeader);
+            topAccordionDiv.appendChild(maintainerAccordionDiv);
+        }
+
+        mostActiveMaintainerDiv.appendChild(topAccordionDiv);
+
+        $(".accordion").accordion({
+            header: "> h2:not(.item)",
+            heightStyle: "content",
+            active: false,
+            collapsible: true
+        });
+    }
+
     function updateMaintainersTable(maintainerMapPath, filepath, maintainers) {
         let infoParagraph = document.querySelector('#info_help');
         infoParagraph.textContent = "";
 
+        let mostActiveMaintainerDiv = document.querySelector('#most-active-maintainer-div');
+        clearInner(mostActiveMaintainerDiv);
+
         let maintainerCodePathDiv = document.querySelector('#maintainer-div');
-
-        // recursively remove all existing maintainers
-        // https://stackoverflow.com/a/32261977
-
-        function clearInner(node) {
-            while (node.hasChildNodes()) {
-                clear(node.firstChild);
-            }
-        }
-          
-        function clear(node) {
-            while (node.hasChildNodes()) {
-                clear(node.firstChild);
-            }
-            node.parentNode.removeChild(node);
-        }
           
         clearInner(maintainerCodePathDiv);
 
@@ -82,7 +163,7 @@
             let codePath = codePaths[codeIndex];
             let code = maintainers[codePath].code;
             let maintainerList = maintainers[codePath].maintainer;
-            let codeHeader = document.createElement("h2"); // <h3>addons/account</h3>
+            let codeHeader = document.createElement("h2"); // <h2>addons/account</h2>
             codeHeader.innerText = codePath + ((code.regex && code.regex === true) ? " (regex)" : "");
 
             let maintainerDiv = document.createElement("div"); // <div>
@@ -91,7 +172,7 @@
             for (let i = 0 ; i < maintainerList.length ; ++i) {
                 const maintainer = maintainerList[i];
                 
-                let maintainerHeader = document.createElement("h2"); // <h3>William</h3>
+                let maintainerHeader = document.createElement("h2"); // <h2>William</h2>
                 maintainerHeader.innerHTML = maintainer.name;
     
                 let maintainerContactDiv = document.createElement("div"); // <div>
