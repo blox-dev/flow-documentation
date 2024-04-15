@@ -7,7 +7,7 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { FlowsViewProvider } from "./flowsView";
 import { MaintainersViewProvider } from "./maintainersview";
-import { pathsAreEqual, escapeRegExp } from "./utils";
+import { pathsAreEqual, escapeRegExp, escapeBackSlashRegExp } from "./utils";
 import { GraphView } from "./graphview";
 // import * as zlib from 'zlib';
 
@@ -170,9 +170,11 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
 
       if (code[j].regex && code[j].regex === true) {
         // try regex matching on the path
-        const reg = new RegExp(escapeRegExp(nCodePath), 'gi');
+        // const reg = new RegExp(escapeRegExp(nCodePath), 'gi');
+        // const reg = new RegExp(nCodePath, 'gi');
+        const reg = new RegExp(escapeBackSlashRegExp(nCodePath), 'gi');
         if (reg.test(nActiveFilePath)) {
-          maintainers.push({"contact": codeMaintainerMap[i].contact, "code": code[j]});
+          maintainers.push({"contact": codeMaintainerMap[i].contact, "maintainedCount": code.length, "code": code[j]});
           break;
         }
       }
@@ -192,15 +194,16 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
           continue;
         }
       }
-      maintainers.push({"contact": codeMaintainerMap[i].contact, "code": code[j]});
+      maintainers.push({"contact": codeMaintainerMap[i].contact, "maintainedCount": code.length , "code": code[j]});
     }
   }
   // prepare maintainers
   let codeMap: LooseObject = {};
 
   for (let i=0 ; i<maintainers.length ; ++i) {
-    const {contact, code} = maintainers[i];
-    if (!(code.path in codeMap)) {
+    let {contact, maintainedCount, code} = maintainers[i];
+    contact.maintainedCount = maintainedCount;
+    if (!(code.path in codeMap)) { 
       codeMap[code.path] = {"code": code, "maintainer": [contact]};
     } else {
       codeMap[code.path].maintainer.push(contact);

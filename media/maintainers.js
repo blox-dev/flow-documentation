@@ -122,7 +122,6 @@
         clearInner(mostActiveMaintainerDiv);
 
         let maintainerCodePathDiv = document.querySelector('#maintainer-div');
-          
         clearInner(maintainerCodePathDiv);
 
 
@@ -163,6 +162,10 @@
             let codePath = codePaths[codeIndex];
             let code = maintainers[codePath].code;
             let maintainerList = maintainers[codePath].maintainer;
+            // order maintainers by number of paths they manage, the least busy should appear first
+            // as we assume that they are the most specialized in this issue
+            maintainerList.sort((a, b) => a.maintainedCount - b.maintainedCount);
+
             let codeHeader = document.createElement("h2"); // <h2>addons/account</h2>
             codeHeader.innerText = codePath + ((code.regex && code.regex === true) ? " (regex)" : "");
 
@@ -178,7 +181,7 @@
                 let maintainerContactDiv = document.createElement("div"); // <div>
     
                 for (const [key, value] of Object.entries(maintainer)) {
-                    if (["name", "maintains"].includes(key)) {
+                    if (["name", "maintains", "maintainedCount"].includes(key)) {
                         continue;
                     }
                     if (!value || (key === "_old" && value.length === 0)) {

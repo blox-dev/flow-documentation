@@ -14,6 +14,10 @@ export function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export function escapeBackSlashRegExp(string: string) {
+  return string.replace(/[\\]/g, '\\$&');
+}
+
 export function replaceAll(str: string, find: string, replace: string) {
   return str.replace(new RegExp(escapeRegExp(find), 'g'), replace);
 }
