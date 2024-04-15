@@ -1,0 +1,29 @@
+[
+    {
+        "contact": {
+            "name": "",
+            "team": "",
+            "position": "",
+            "email": "",
+            "phone": "",
+            "internal_phone": "",
+            "discord": "",
+            "teams": "",
+            "slack": "",
+            "twitter": "",
+            "github": "",
+            "_old": []
+        },
+        "maintains": [
+            {
+                "type": "folder",
+                "regex": true,
+                "path": ""
+            },
+            {
+                "type": "file",
+                "path": ""
+            }
+        ]
+    }
+]
