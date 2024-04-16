@@ -32,6 +32,14 @@ export class GraphView {
           let breakPoints = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
 
           let graph: String[] = ["graph TD"];
+
+          // add all nodes to the graph before checking the edges
+          // so that isolated noted will still be displayed
+
+          for (const node of Object.values(data.graph.nodes as LooseObject)) {
+            graph.push(`${node.func_name}[${node.func_name}]`);
+          }
+
           for (let i = 0; i < data.graph.edges.length; ++i) {
             const edge = data.graph.edges[i];
 
