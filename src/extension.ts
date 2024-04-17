@@ -330,7 +330,7 @@ export function extractRFF(context: vscode.ExtensionContext) {
       if (wordCounts[folderPathNorm]) {
         return;
       }
-      const subfolderCounts = extractPatternInSubfolders(folderPath);
+      const subfolderCounts = extractPatternInSubfolders(folderPath, 0);
 
       // Add project info to each function and funcs
       let [projectRoutes, projectFlows, projectFuncs] = flattenRFF(subfolderCounts);
@@ -405,7 +405,7 @@ export function extractRFF(context: vscode.ExtensionContext) {
   return [routes, flows, funcs];
 }
 
-function extractPatternInSubfolders(folderPath: string): LooseObject {
+function extractPatternInSubfolders(folderPath: string, level: number): LooseObject {
   const files = fs.readdirSync(folderPath, { withFileTypes: true });
   const subfolderCounts: LooseObject = {};
 
@@ -423,7 +423,7 @@ function extractPatternInSubfolders(folderPath: string): LooseObject {
       }
     } else if (file.isDirectory() && !file.name.startsWith(".")) {
       // Recursively search for Python files in subdirectories
-      const deeperCounts = extractPatternInSubfolders(filePath);
+      const deeperCounts = extractPatternInSubfolders(filePath, level + 1);
       if (Object.keys(deeperCounts).length) {
         subfolderCounts[filePath] = deeperCounts;
       }
@@ -431,7 +431,7 @@ function extractPatternInSubfolders(folderPath: string): LooseObject {
   });
 
   // flatten hierarchy attempt
-  if (Object.keys(subfolderCounts).length === 1) {
+  if (Object.keys(subfolderCounts).length === 1 && level > 1) {
     return subfolderCounts[Object.keys(subfolderCounts)[0]];
   }
   return subfolderCounts;
