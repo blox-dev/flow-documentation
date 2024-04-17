@@ -148,7 +148,7 @@ class SimplifyAST(ast.NodeTransformer):
         return self.generic_visit(node)
 
     def visit_For(self, node):
-        return self.visit(node.body)
+        return self.generic_visit(node)
 
     def visit_AsyncFor(self, node):
         return self.generic_visit(node)
@@ -184,7 +184,7 @@ class SimplifyAST(ast.NodeTransformer):
         return None
 
     def visit_While(self, node):
-        return self.visit(node.body)
+        return self.generic_visit(node)
 
     def visit_With(self, node):
         return self.generic_visit(node)
@@ -205,9 +205,7 @@ class SimplifyAST(ast.NodeTransformer):
         return self.generic_visit(node)
 
     def visit_List(self, node):
-        # Visit all elements in the list
-        for item in node.elts:
-            self.visit(item)
+        self.generic_visit(node)
 
     def visit_ListComp(self, node):
         return self.generic_visit(node)

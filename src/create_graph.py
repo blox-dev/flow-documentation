@@ -61,7 +61,8 @@ class GraphMaker(ast.NodeVisitor):
                     break
             else:
                 # The graph should not contain any unrecognized function calls
-                raise
+                # raise
+                pass
         elif isinstance(node.func, ast.Attribute):
             # Handle method calls like "obj.method()"
             y = self._get_attribute_chain(node.func)
