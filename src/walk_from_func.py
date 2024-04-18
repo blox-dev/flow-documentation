@@ -3,7 +3,6 @@ import importlib.util
 import re
 import sys
 from collections import defaultdict
-from simplify_ast import SimplifyAST
 from create_graph import create_graph
 from pathlib import Path
 from ast2json import ast2json
@@ -242,17 +241,12 @@ def lets_go(filepath, target_func, routes=[]):
     walker.visit(tree)
     asts = walker.asts
     modules = walker.modules_to_import
-    simplifier = SimplifyAST(walker.references_per_module)
-    output = {"asts": []}
+    output = {}
     interm = {"asts": []}
     for mod_name, func_dict in asts.items():
         for func_name, func_ast in func_dict.items():
-            # print(ast.dump(simplifier.simplify_ast(func_ast, mod_name)))
-            simplified_ast = simplifier.simplify_ast(func_ast, mod_name)
-            interm_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": simplified_ast}
-            json_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": ast2json(simplified_ast)}
+            interm_func = {"module": mod_name, "file": modules[mod_name][0], "func_name": func_name, "ast": func_ast}
             interm["asts"].append(interm_func)
-            output["asts"].append(json_func)
     graph = create_graph(current_filename, target_func, interm["asts"])
     output["graph"] = graph
     print(json.dumps(output), file=sys.stdout, flush=True)
