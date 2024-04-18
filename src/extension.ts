@@ -221,7 +221,7 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const modName = path.basename(filePath, path.extname(filePath));
 
   const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g;
-  const funcPattern = /def\s+(.+)\s*\(.*\)\s*:/g;
+  const funcPattern = /def\s+(.+)\s*\(.*\)[^:]*:/g;
   const flowStartPattern = /#+\s*flow-start\((.+)\)/g;
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
 
