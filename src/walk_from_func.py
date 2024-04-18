@@ -102,6 +102,11 @@ class ImportVisitor(ast.NodeVisitor):
                 self.references_per_module[k].update(iv.references_per_module[k])
                 # TODO: references from new module should be somehow added to the current module references
                 # self.references_per_module[self.current_module].update(iv.references_per_module[k])
+            for k, v in iv.modules_to_import.items():
+                if k not in self.modules_to_import:
+                    self.modules_to_import[k] = v
+                else:
+                    self.modules_to_import[k][1].update(v[1])
             self.imported_modules.add(mod_name)
 
             for mod_name, d in iv.asts.items():
