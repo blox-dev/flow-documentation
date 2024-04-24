@@ -1,65 +1,212 @@
 {
-    "create_name": {
-        "contact": {},
-        "route_expr": "/keys",
-        "module": "main",
-        "func_name": "create_name",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    "add_item_to_cart": {
+        "route_expr": "/cart/add",
+        "module": "cart",
+        "func_name": "add_item_to_cart",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "read_name": {
-        "contact": {},
-        "route_expr": "/keys/<key>",
-        "module": "main",
-        "func_name": "read_name",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    "update_item_in_cart": {
+        "route_expr": "/cart/update/<int:item_id>",
+        "module": "cart",
+        "func_name": "update_item_in_cart",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "update_name": {
-        "contact": {},
-        "route_expr": "/keys/<key>",
-        "module": "main",
-        "func_name": "update_name",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    "remove_item_from_cart": {
+        "route_expr": "/cart/remove/<int:item_id>",
+        "module": "cart",
+        "func_name": "remove_item_from_cart",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "delete_name": {
-        "contact": {},
-        "route_expr": "/keys/<key>",
-        "module": "main",
-        "func_name": "delete_name",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    "get_cart_items": {
+        "route_expr": "/cart/items/<int:user_id>",
+        "module": "cart",
+        "func_name": "get_cart_items",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "print_database": {
-        "contact": {},
-        "route_expr": "/debug",
-        "module": "main",
-        "func_name": "print_database",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\fullstack_tutorial-master\\backend\\main.py"
+    "get_total_price": {
+        "route_expr": "/cart/total_price/<int:user_id>",
+        "module": "cart",
+        "func_name": "get_total_price",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "logout": {
-        "contact": {},
-        "route_expr": "/logout",
-        "module": "views",
-        "func_name": "logout",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    "get_cart_by_user_id": {
+        "route_expr": "/cart/user/<int:user_id>",
+        "module": "cart",
+        "func_name": "get_cart_by_user_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "register": {
-        "contact": {},
-        "route_expr": "/register",
-        "module": "views",
-        "func_name": "register",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    "purchase_cart": {
+        "route_expr": "/cart/purchase/<int:user_id>",
+        "module": "cart",
+        "func_name": "purchase_cart",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\cart_microservice\\cart.py"
     },
-    "login": {
-        "contact": {},
-        "route_expr": "/login",
-        "module": "views",
-        "func_name": "login",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    "place_order": {
+        "route_expr": "/orders/place",
+        "module": "order",
+        "func_name": "place_order",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
     },
-    "index": {
-        "contact": {},
-        "route_expr": "/<path>",
-        "module": "views",
-        "func_name": "index",
-        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\users_microservice\\sample-flask-bootstrap-main\\app\\views.py"
+    "update_order_status": {
+        "route_expr": "/orders/update_status/<int:order_id>",
+        "module": "order",
+        "func_name": "update_order_status",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "get_order_by_id": {
+        "route_expr": "/orders/<int:order_id>",
+        "module": "order",
+        "func_name": "get_order_by_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "get_orders_by_user_id": {
+        "route_expr": "/orders/user/<int:user_id>",
+        "module": "order",
+        "func_name": "get_orders_by_user_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "get_orders_by_status": {
+        "route_expr": "/orders/status/<string:status>",
+        "module": "order",
+        "func_name": "get_orders_by_status",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "get_payment_status": {
+        "route_expr": "/orders/payment_status/<string:payment_status>",
+        "module": "order",
+        "func_name": "get_payment_status",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "get_total_revenue": {
+        "route_expr": "/orders/total_revenue",
+        "module": "order",
+        "func_name": "get_total_revenue",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "cancel_order": {
+        "route_expr": "/orders/cancel/<int:order_id>",
+        "module": "order",
+        "func_name": "cancel_order",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "accept_order": {
+        "route_expr": "/orders/accept/<int:order_id>",
+        "module": "order",
+        "func_name": "accept_order",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\order_microservice\\order.py"
+    },
+    "process_payment": {
+        "route_expr": "/payments/process",
+        "module": "payment",
+        "func_name": "process_payment",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "update_payment_status": {
+        "route_expr": "/payments/update_status/<int:payment_id>",
+        "module": "payment",
+        "func_name": "update_payment_status",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "get_payments_by_order_id": {
+        "route_expr": "/payments/order/<int:order_id>",
+        "module": "payment",
+        "func_name": "get_payments_by_order_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "get_payments_by_user_id": {
+        "route_expr": "/payments/user/<int:user_id>",
+        "module": "payment",
+        "func_name": "get_payments_by_user_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "get_payments_by_status": {
+        "route_expr": "/payments/status/<string:status>",
+        "module": "payment",
+        "func_name": "get_payments_by_status",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "calculate_total_revenue": {
+        "route_expr": "/payments/total_revenue",
+        "module": "payment",
+        "func_name": "calculate_total_revenue",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\payment_microservice\\payment.py"
+    },
+    "add_product": {
+        "route_expr": "/products/add",
+        "module": "product",
+        "func_name": "add_product",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "update_product": {
+        "route_expr": "/products/update/<int:product_id>",
+        "module": "product",
+        "func_name": "update_product",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "get_product_by_id": {
+        "route_expr": "/products/<int:product_id>",
+        "module": "product",
+        "func_name": "get_product_by_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "get_products_by_category": {
+        "route_expr": "/products/category/<string:category>",
+        "module": "product",
+        "func_name": "get_products_by_category",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "get_products_by_price_range": {
+        "route_expr": "/products/price_range",
+        "module": "product",
+        "func_name": "get_products_by_price_range",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "search_products": {
+        "route_expr": "/products/search",
+        "module": "product",
+        "func_name": "search_products",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\product_microservice\\product.py"
+    },
+    "register_user": {
+        "route_expr": "/users/register",
+        "module": "user",
+        "func_name": "register_user",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "login_user": {
+        "route_expr": "/users/login",
+        "module": "user",
+        "func_name": "login_user",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "get_user_by_id": {
+        "route_expr": "/users/<int:user_id>",
+        "module": "user",
+        "func_name": "get_user_by_id",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "get_user_by_username": {
+        "route_expr": "/users/username/<string:username>",
+        "module": "user",
+        "func_name": "get_user_by_username",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "get_all_users": {
+        "route_expr": "/users",
+        "module": "user",
+        "func_name": "get_all_users",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "update_user": {
+        "route_expr": "/users/update/<int:user_id>",
+        "module": "user",
+        "func_name": "update_user",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
+    },
+    "delete_user": {
+        "route_expr": "/users/delete/<int:user_id>",
+        "module": "user",
+        "func_name": "delete_user",
+        "route_file": "f:\\Facultate\\Master2\\Thesis\\code\\demo\\projects\\shopping-app\\user_microservice\\user.py"
     }
 }

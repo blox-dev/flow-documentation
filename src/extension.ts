@@ -220,7 +220,8 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
   const content = fs.readFileSync(filePath, "utf8");
   const modName = path.basename(filePath, path.extname(filePath));
 
-  const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g;
+  // const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"][^\)]*\)/g;
+  const routePattern = /@app.route\([\'\"]([^\)\'\"]+)[\'\"](?:[^\)]*methods=\[([^\]]*)\][^\)]*|[^\)]*)\)/g;
   const funcPattern = /def\s+(.+)\s*\(.*\)[^:]*:/g;
   const flowStartPattern = /#+\s*flow-start\((.+)\)/g;
   const flowEndPattern = /#+\s*flow-end\((.+)\)/g;
@@ -238,7 +239,48 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
     for (let i = 0; i < nextLines.length; ++i) {
       const x = funcPattern.exec(nextLines[i]);
       if (x) {
-        matches.routes.push({ module: modName, name: match[1], lineno: lineCountBeforeMatch, func_name: x[1] });
+        let cMethods = ["GET"];
+
+        if (match.length > 2) {
+          // Update matches and do cleaning
+          // @app.route(matches=['POST','GET'])
+          let methods = match[2].split(',');
+          let cleanMethods = [];
+          for (let i = 0; i< methods.length; ++i ) {
+            let method = methods[i];
+            method = method.trim();
+            while(method.length && ['\'', '"'].includes(method[0])) {
+              method = method.slice(1);
+            }
+            while(method.length && ['\'', '"'].includes(method[method.length - 1])) {
+              method = method.slice(0, method.length - 1);
+            }
+            cleanMethods.push(method);
+          }
+          cMethods = cleanMethods;
+        }
+        
+        let route_string = match[1];
+        // create pattern of route parts: 'c' = constant, 'v' = variable
+        // e.g. /user/<user_id => "cv", /user/register => "cc".
+        // regex string /user/(.+) => "cv", should match the first route, but not the second one
+
+        let route_cv_pattern = "";
+        let route_string_split = route_string.split('/');
+        for (let i = 0; i < route_string_split.length ; ++i) {
+          let route_part = route_string_split[i];
+          if (!route_part.length) {
+            continue;
+          }
+          if (route_part[0] === '<' && route_part[route_part.length - 1] === '>') {
+            route_cv_pattern += 'v';
+          }
+          else {
+            route_cv_pattern += 'c';
+          }
+        }
+
+        matches.routes.push({ module: modName, name: route_string, methods: cMethods, route_pattern: route_cv_pattern, lineno: lineCountBeforeMatch, func_name: x[1] });
         break;
       }
     }
@@ -382,7 +424,6 @@ export function extractRFF(context: vscode.ExtensionContext) {
       const routeId = route.func_name;
 
       endP[routeId] = {
-        "contact": {},
         "route_expr": route.name,
         "module": route.module,
         "func_name": route.func_name,
