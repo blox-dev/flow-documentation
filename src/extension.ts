@@ -340,7 +340,12 @@ export function extractRFF(context: vscode.ExtensionContext) {
   // TODO: extend the list for more project, or introduce algorithm to generate
   // 1 color per each folder (maximally distinct)
   // const colors = ["#228b22", "#00008b", "#b03060", "#ff4500", "#ffff00", "#deb887", "#00ff00", "#00ffff", "#ff00ff", "#6495ed"];
-  const colors = ["#7f9f9f", "#72cb72", "#c05050", "#ffff50", "#50ff50", "#e450f3", "#50ffff", "#6ee0ff", "#fffefd", "#ffa9f4"];
+  let colors = ['#ffff99', '#ffcc99', '#ccffcc', '#99ccff', '#ffccff', '#ccccff', '#ff9999', '#99ffcc', '#99ffff', '#ccff99'];
+  
+  const approximateColor: string = vscode.workspace.getConfiguration().get('workbench.colorTheme') || '';
+  if (approximateColor.toLowerCase().includes('dark')) {
+    colors = ['#2f4f4f', '#9932cc', '#4682b4', '#556b2f', '#708090', '#008b8b', '#483d8b', '#696969', '#8fbc8f', '#00ced1']; 
+  }
   let colorIndex = 0;
 
   let routes: LooseObject[] = [];

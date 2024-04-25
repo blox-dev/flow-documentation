@@ -9,7 +9,7 @@
     switch (message.command) {
       case "setGraphData": {
         console.log("setGraphData", message);
-        doStuff(message.graphData, message.graphString, message.legendString, message.affectedFiles);
+        doStuff(message.graphData, message.graphString, message.graphStyle, message.legendString, message.affectedFiles);
         break;
       }
     }
@@ -42,7 +42,7 @@
     }, 501);
   }
 
-  async function doStuff(graphData, graphString, legendString, affectedFiles) {
+  async function doStuff(graphData, graphString, graphStyle, legendString, affectedFiles) {
     const htmlCode = await mermaid.mermaidAPI.render(
       "mermaidChart",
       graphString
@@ -57,11 +57,11 @@
 
     console.log("----------- nodes ------------");
     console.log(nodeData);
-    updateNodes(nodeData);
+    updateNodes(nodeData, graphStyle);
 
     console.log("----------- edges ------------");
     console.log(edgeData);
-    updateEdges(nodeData, edgeData);
+    updateEdges(nodeData, edgeData, graphStyle);
 
     const affList = document.querySelector(".affected-files-list");
     while (affList.firstChild) {
@@ -86,7 +86,7 @@
     );
   }
 
-  function updateNodes(nodeData) {
+  function updateNodes(nodeData, graphStyle) {
     const nodes = document.querySelectorAll(".node");
     nodes.forEach((node) => {
       const nodeId = node.id;
@@ -100,7 +100,7 @@
       const rect = node.getElementsByTagName("rect")[0];
       if (nn.is_route && nn.is_route === true) {
         rect.style.fill = nn.project_color;
-        rect.style.stroke = nn.project_color;
+        rect.style.strokeWidth = graphStyle.borderStrokeWidth;
         if (nn.project_color === "#ff0000") {
           node.style.cursor = "not-allowed";
           node.onclick = null;
@@ -115,7 +115,8 @@
         rect.style.stroke = "red";
         rect.style.strokeWidth = "5px";
       } else {
-        rect.style.strokeWidth = "0px";
+        rect.style.stroke = graphStyle.primaryBorderColor;
+        rect.style.strokeWidth = graphStyle.borderStrokeWidth;
       }
 
       // add context menu
@@ -153,7 +154,7 @@
               e.preventDefault();
               removeBreakpoint(nn.file, nn.lineno + 1);
               nn.hasBreakpoint = false;
-              updateNodes(nodeData);
+              updateNodes(nodeData, graphStyle);
             };
           } else {
             var addBrkFunc = document.getElementById("add-brk-func");
@@ -163,7 +164,7 @@
               // +1 because the lineno points at the function header, not the function code
               addBreakpoint(nn.file, nn.lineno + 1);
               nn.hasBreakpoint = true;
-              updateNodes(nodeData);
+              updateNodes(nodeData, graphStyle);
             };
 
             var remBrkFunc = document.getElementById("rem-brk-func");
@@ -182,7 +183,7 @@
     });
   }
 
-  function updateEdges(nodeData, edgeData) {
+  function updateEdges(nodeData, edgeData, graphStyle) {
     const edges = document.querySelectorAll(".flowchart-link");
     edges.forEach((edge) => {
       // reverse engineer node ids from edge name
@@ -199,12 +200,15 @@
         (x) => x.start_node === start_node_name && x.end_node === end_node_name
       )[0];
 
+      if (edggge === undefined) {
+        return;
+      }
       const callLines = edggge.call_lines;
 
       if (edggge.hasBreakpoint) {
         edge.style.stroke = "red";
       } else {
-        edge.style.stroke = "#333333";
+        edge.style.stroke = graphStyle.primaryBorderColor;
       }
 
       // add context menu
@@ -235,7 +239,7 @@
 
               removeBreakpoint(sn.file, callLines.map(function (elem) { return elem - 1; }));
               edggge.hasBreakpoint = false;
-              updateEdges(nodeData, edgeData);
+              updateEdges(nodeData, edgeData, graphStyle);
             };
           } else {
             var addBrkCall = document.getElementById("add-brk-call");
@@ -245,7 +249,7 @@
 
               addBreakpoint(sn.file, callLines.map(function (elem) { return elem - 1; }));
               edggge.hasBreakpoint = true;
-              updateEdges(nodeData, edgeData);
+              updateEdges(nodeData, edgeData, graphStyle);
             };
 
             var remBrkCall = document.getElementById("rem-brk-call");

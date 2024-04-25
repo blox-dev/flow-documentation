@@ -31,7 +31,32 @@ export class GraphView {
         case "fetchGraphData": {
           let breakPoints = vscode.debug.breakpoints as vscode.SourceBreakpoint[];
 
-          let graph: String[] = ["graph TD"];
+          let mermaidStyle = {
+            'background': '#f4f4f4',
+            'primaryColor': '#ECECFF',
+            'primaryBorderColor': '#9370DB',
+            'primaryTextColor': '#333',
+            'borderStrokeWidth': '1px',
+          };
+
+          let mermaidDarkStyle = {
+            'background': '#f4f4f4',  // originally #333
+            'primaryColor': '#1f2020;',
+            'primaryBorderColor': '#81B1DB',
+            'primaryTextColor': '#ccc',
+            'borderStrokeWidth': '1px',
+          };
+
+          let graph: String[] = [];
+          const approximateColor: string = vscode.workspace.getConfiguration().get('workbench.colorTheme') || '';
+          if (approximateColor.toLowerCase().includes('dark')) {
+            graph.push(`%%{init: {"theme":"dark"}}%%`);
+            mermaidStyle = mermaidDarkStyle;
+          }
+          else {
+            graph.push(`%%{init: {"theme":"default"}}%%`);
+          }
+          graph.push("graph TD");
 
           // add all nodes to the graph before checking the edges
           // so that isolated noted will still be displayed
@@ -117,6 +142,7 @@ export class GraphView {
             command: "setGraphData",
             graphData: data,
             graphString: graphString,
+            graphStyle: mermaidStyle,
             legendString: legendString,
             affectedFiles: Object.fromEntries(affectedFiles.entries()),
           });
