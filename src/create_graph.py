@@ -12,6 +12,10 @@ class GraphMaker(ast.NodeVisitor):
         self.graph = defaultdict(list) # {(start_id, end_id): [call_lineno]}
         self.max_id = max_id
         self.visited_nodes = set([start_id])
+        
+        # set of dotted edges to be added in the graph, so that the logical order of calling services is kept
+        self.dotted_edges = []
+        self.last_route_node = None
 
     def _get_attribute_chain(self, node):
         if isinstance(node, ast.Name):
@@ -29,22 +33,38 @@ class GraphMaker(ast.NodeVisitor):
     def visit_Call(self, node):
         if hasattr(node, 'is_route') and node.is_route:
             # TODO: actually import the route nodes and parse them instead of dummy nodes
-            
+            # if (self.last_route_node is not None):
+            #     self.dotted_edges.append((self.last_route_node, node.id))
             if hasattr(node, 'route') and node.route:
                 for n in self.nodes:
                     if is_same_node(node.route, n):
-                       self.graph[(self.current_node, n['id'])].append(node.lineno)
-                       break 
+                        self.graph[(self.current_node, n['id'])].append(node.lineno)
+                        
+                        if (self.last_route_node is not None):
+                            self.dotted_edges.append((self.last_route_node["id"], n["id"]))
+                        self.last_route_node = n
+                        
+                        break 
                 else:
                     # unvisited external node, create dummy with some info at least
-                    self.nodes.append({'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func_name"] , 'ast': None, 'id': self.max_id, 'is_route': True})
+                    new_node = {'module': node.route["module"], 'file': node.route["file"], 'func_name': node.route["func_name"] , 'ast': None, 'id': self.max_id, 'is_route': True}
+                    self.nodes.append(new_node)
                     self.graph[(self.current_node, self.max_id)].append(node.lineno)
                     self.max_id += 1
+
+                    if (self.last_route_node is not None):
+                        self.dotted_edges.append((self.last_route_node["id"], new_node["id"]))
+                    self.last_route_node = new_node
             else:
                 # the route is unknown / external
-                self.nodes.append({'module': 'dummy', 'file': 'dummy', 'func_name': self._get_attribute_chain(node.func) , 'ast': None, 'id': self.max_id, 'is_route': True})
+                new_node = {'module': 'dummy', 'file': 'dummy', 'func_name': self._get_attribute_chain(node.func) , 'ast': None, 'id': self.max_id, 'is_route': True}
+                self.nodes.append(new_node)
                 self.graph[(self.current_node, self.max_id)].append(node.lineno)
                 self.max_id += 1
+
+                if (self.last_route_node is not None):
+                    self.dotted_edges.append((self.last_route_node["id"], new_node["id"]))
+                self.last_route_node = new_node
             return
         if isinstance(node.func, ast.Name):
             # Handle simple function calls like "foo()"
@@ -104,4 +124,8 @@ def create_graph(module, target_func, asts):
     nodes = dict()
     for ast in asts:
         nodes[ast["func_name"]] = {k: v for (k, v) in ast.items() if k != 'ast'}
-    return {'nodes': nodes, 'edges': [{'start_node': asts[k[0]]["func_name"], 'end_node': asts[k[1]]["func_name"], 'call_lines': v} for (k, v) in gm.graph.items()]}
+    return {
+        'nodes': nodes,
+        'edges': [{'start_node': asts[k[0]]["func_name"], 'end_node': asts[k[1]]["func_name"], 'call_lines': v} for (k, v) in gm.graph.items()],
+        'dotted_edges': [{'start_node': asts[k[0]]["func_name"], 'end_node': asts[k[1]]["func_name"]} for k in gm.dotted_edges]
+    }

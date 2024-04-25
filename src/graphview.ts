@@ -58,6 +58,20 @@ export class GraphView {
               `${startNode.func_name}[${startNode.func_name}] ==> ${endNode.func_name}[${endNode.func_name}]`
             );
           }
+
+          if ("dotted_edges" in data.graph) {
+            for (let i = 0; i < data.graph.dotted_edges.length; ++i) {
+              const edge = data.graph.dotted_edges[i];
+
+              const startNode = data.graph.nodes[edge.start_node];
+              const endNode = data.graph.nodes[edge.end_node];
+
+              graph.push(
+                `${startNode.func_name}[${startNode.func_name}] -.- ${endNode.func_name}[${endNode.func_name}]`
+              );
+            }
+          }
+
           let graphString: String = graph.join("\n");
 
           let legend = new Map();
