@@ -29,3 +29,7 @@ body {
 	border: none;
 	margin: 0 auto;
 }
+
+.loading-message {
+	display: none;
+}

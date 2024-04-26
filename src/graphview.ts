@@ -202,7 +202,7 @@ export class GraphView {
           <div class="affected-files-div">
             <h4>Affected files</h4>
             <ul class="affected-files-list">
-              <li>hi</li>
+              <li>Loading...</li>
             </ul>
           </div>
       

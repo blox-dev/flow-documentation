@@ -93,6 +93,7 @@ export class FlowsViewProvider implements vscode.WebviewViewProvider {
 			<body>
                 <button class="fetch-flows-button">Fetch flows</button>
 
+				<p class="loading-message">Loading...</p>
 				<table id="flow-table" class="flow-list"></table>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>

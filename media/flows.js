@@ -3,8 +3,13 @@
 (function () {
     const vscode = acquireVsCodeApi();
 
+    let messageP = document.querySelector('.loading-message');
+
     document.querySelector('.fetch-flows-button').addEventListener('click', () => {
         vscode.postMessage({ command: 'fetchFlows' });
+        if (messageP) {
+            messageP.style.display = 'block';
+        }
     });
 
     window.addEventListener('message', event => {
@@ -13,6 +18,9 @@
             case 'updateFlows':
                 {
                     console.log('updateFlows', message.flows);
+                    if (messageP) {
+                        messageP.style.display = 'none';
+                    }
                     updateFlowsTable(message.flows);
                     break;
                 }
