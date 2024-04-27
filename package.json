@@ -1,4 +1,9 @@
 {
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blox-dev/flow-documentation"
+  },
+  "publisher": "blox-dev",
   "name": "flow-documentation",
   "displayName": "flow-documentation",
   "description": "",
