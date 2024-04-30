@@ -45,12 +45,16 @@
       {
         "command": "flow-documentation.chooseMaintainerFile",
         "title": "Choose Maintainer File"
+      },
+      {
+        "command": "flow-documentation.highlightCodeInGraph",
+        "title": "Highlight in Flow Graph"
       }
     ],
     "configuration": {
       "title": "FlowDoc",
       "properties": {
-        "wordCounter.extraFolders": {
+        "flow-documentation.extraFolders": {
           "type": "array",
           "default": [],
           "description": "List of extra folders to scan."
@@ -61,6 +65,10 @@
       "editor/context": [
         {
           "command": "flow-documentation.showMaintainer"
+        },
+        {
+          "command": "flow-documentation.highlightCodeInGraph",
+          "when": "resourceLangId == python"
         }
       ],
       "explorer/context": [

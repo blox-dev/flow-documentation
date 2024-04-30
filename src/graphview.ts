@@ -4,7 +4,7 @@ import { openFile, addBreakpoint, pathsAreEqual } from "./utils";
 
 export class GraphView {
 
-  private _view?: vscode.Webview;
+  private _panel?: vscode.WebviewPanel;
 
   private _extensionUri: vscode.Uri;
 
@@ -22,9 +22,13 @@ export class GraphView {
         retainContextWhenHidden: true,
       }
     );
-    this._view = panel.webview;
+    this._panel = panel;
 
     panel.webview.html = this._getHtmlForWebview(panel.webview);
+
+    panel.onDidDispose(() => {
+      this._panel = undefined;
+    });
 
     panel.webview.onDidReceiveMessage((message) => {
       switch (message.command) {
@@ -138,7 +142,7 @@ export class GraphView {
 
           // affected files
 
-          this._view?.postMessage({
+          this._panel?.webview.postMessage({
             command: "setGraphData",
             graphData: data,
             graphString: graphString,
@@ -167,6 +171,16 @@ export class GraphView {
           break;
         }
       }
+    });
+  }
+
+  public highlightCode(filePath: string, selectedLineNumber: number) {
+    // reveal the current panel
+    this._panel?.reveal();
+    this._panel?.webview.postMessage({
+      command: "highlightCode",
+      filePath: filePath,
+      selectedLineNumber: selectedLineNumber
     });
   }
 

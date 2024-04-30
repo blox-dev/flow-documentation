@@ -9,7 +9,13 @@
     switch (message.command) {
       case "setGraphData": {
         console.log("setGraphData", message);
+        document.graphData = message.graphData;
         doStuff(message.graphData, message.graphString, message.graphStyle, message.legendString, message.affectedFiles);
+        break;
+      }
+      case "highlightCode": {
+        console.log("highlightCode", message);
+        highlightCode(document.graphData, message.filePath, message.selectedLineNumber);
         break;
       }
     }
@@ -40,6 +46,53 @@
     setTimeout(function () {
       i.visibility = "hidden";
     }, 501);
+  }
+
+  function highlightCode(graphData, filePath, selectedLineNumber) {
+    const nodes = graphData.graph.nodes;
+    let currentNode = { "funcName": null, "lineno": -1 };
+    for (const nodeName in nodes) {
+      if (nodes.hasOwnProperty(nodeName)) {
+        const lineno = nodes[nodeName].lineno;
+        if (nodes[nodeName].file === filePath && lineno > currentNode.lineno && lineno <= selectedLineNumber) {
+          currentNode = { "funcName": nodeName, "lineno": nodes[nodeName].lineno };
+        }
+      }
+    }
+
+    // check if there is an edge in the graph which exactly matches the highlighted line,
+    // in which case the endNode should be highlighted
+
+    const edges = graphData.graph.edges;
+    for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+      const edge = edges[edgeIndex];
+      if (edge.start_node === currentNode.funcName && edge.call_lines.includes(selectedLineNumber)) {
+        currentNode = { "funcName": edge.end_node, "lineno": nodes[edge.end_node].lineno };
+        break;
+      }
+    }
+
+    console.log(selectedLineNumber);
+    console.log(currentNode);
+
+    // highlight the selected node in the graph
+    const uinodes = document.querySelectorAll(".node");
+    uinodes.forEach((node) => {
+      const nodeId = node.id;
+      [_L, node_name, _EdgeNum] = nodeId.split("-");
+
+      if (node_name !== currentNode.funcName) {
+        return;
+      }
+      // add the highlight class to the node we want to highlight
+      const rect = node.getElementsByTagName("rect")[0];
+      rect.classList.add("highlightNode");
+
+      // after 1 second, remove the class
+      setTimeout(function () {
+        rect.classList.remove("highlightNode");
+      }, 1000);
+    });
   }
 
   async function doStuff(graphData, graphString, graphStyle, legendString, affectedFiles) {

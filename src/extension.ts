@@ -15,6 +15,8 @@ export interface LooseObject {
   [key: string]: any
 }
 
+let graphView: GraphView | undefined = undefined;
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -149,13 +151,29 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.window.showInformationMessage('JSON file located and saved');
         }
       });
+    });
 
+  const disposable4 = vscode.commands.registerCommand('flow-documentation.highlightCodeInGraph', function () {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const filePath = editor.document.fileName;
+      const selection = editor.selection;
+      const selectedLineNumber = selection.active.line + 1; // Line numbers are 0-based
+
+      if (graphView === undefined) {
+        vscode.window.showInformationMessage("Create a Flow Graph before highlighting");
+      } else {
+        graphView.highlightCode(filePath, selectedLineNumber);
+      }
+    } else {
+      vscode.window.showInformationMessage('No active editor');
     }
-  );
+  });
 
   context.subscriptions.push(disposable);
   context.subscriptions.push(disposable2);
   context.subscriptions.push(disposable3);
+  context.subscriptions.push(disposable4);
 }
 
 function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject): LooseObject {
@@ -174,7 +192,7 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
         // const reg = new RegExp(nCodePath, 'gi');
         const reg = new RegExp(escapeBackSlashRegExp(nCodePath), 'gi');
         if (reg.test(nActiveFilePath)) {
-          maintainers.push({"contact": codeMaintainerMap[i].contact, "maintainedCount": code.length, "code": code[j]});
+          maintainers.push({ "contact": codeMaintainerMap[i].contact, "maintainedCount": code.length, "code": code[j] });
           break;
         }
       }
@@ -194,17 +212,17 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
           continue;
         }
       }
-      maintainers.push({"contact": codeMaintainerMap[i].contact, "maintainedCount": code.length , "code": code[j]});
+      maintainers.push({ "contact": codeMaintainerMap[i].contact, "maintainedCount": code.length, "code": code[j] });
     }
   }
   // prepare maintainers
   let codeMap: LooseObject = {};
 
-  for (let i=0 ; i<maintainers.length ; ++i) {
-    let {contact, maintainedCount, code} = maintainers[i];
+  for (let i = 0; i < maintainers.length; ++i) {
+    let { contact, maintainedCount, code } = maintainers[i];
     contact.maintainedCount = maintainedCount;
-    if (!(code.path in codeMap)) { 
-      codeMap[code.path] = {"code": code, "maintainer": [contact]};
+    if (!(code.path in codeMap)) {
+      codeMap[code.path] = { "code": code, "maintainer": [contact] };
     } else {
       codeMap[code.path].maintainer.push(contact);
     }
@@ -246,20 +264,20 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
           // @app.route(matches=['POST','GET'])
           let methods = match[2].split(',');
           let cleanMethods = [];
-          for (let i = 0; i< methods.length; ++i ) {
+          for (let i = 0; i < methods.length; ++i) {
             let method = methods[i];
             method = method.trim();
-            while(method.length && ['\'', '"'].includes(method[0])) {
+            while (method.length && ['\'', '"'].includes(method[0])) {
               method = method.slice(1);
             }
-            while(method.length && ['\'', '"'].includes(method[method.length - 1])) {
+            while (method.length && ['\'', '"'].includes(method[method.length - 1])) {
               method = method.slice(0, method.length - 1);
             }
             cleanMethods.push(method);
           }
           cMethods = cleanMethods;
         }
-        
+
         let route_string = match[1];
         // create pattern of route parts: 'c' = constant, 'v' = variable
         // e.g. /user/<user_id => "cv", /user/register => "cc".
@@ -267,7 +285,7 @@ function extractPatterns(filePath: string): Record<string, LooseObject[]> {
 
         let route_cv_pattern = "";
         let route_string_split = route_string.split('/');
-        for (let i = 0; i < route_string_split.length ; ++i) {
+        for (let i = 0; i < route_string_split.length; ++i) {
           let route_part = route_string_split[i];
           if (!route_part.length) {
             continue;
@@ -332,7 +350,7 @@ export function extractRFF(context: vscode.ExtensionContext) {
     ? vscode.workspace.workspaceFolders.map((x) => x.uri.fsPath)
     : [];
 
-  const config = vscode.workspace.getConfiguration("wordCounter");
+  const config = vscode.workspace.getConfiguration("flow-documentation");
   monoRepos.push(...config.get("extraFolders", []));
   const wordCounts: LooseObject = {};
 
@@ -341,10 +359,10 @@ export function extractRFF(context: vscode.ExtensionContext) {
   // 1 color per each folder (maximally distinct)
   // const colors = ["#228b22", "#00008b", "#b03060", "#ff4500", "#ffff00", "#deb887", "#00ff00", "#00ffff", "#ff00ff", "#6495ed"];
   let colors = ['#ffff99', '#ffcc99', '#ccffcc', '#99ccff', '#ffccff', '#ccccff', '#ff9999', '#99ffcc', '#99ffff', '#ccff99'];
-  
+
   const approximateColor: string = vscode.workspace.getConfiguration().get('workbench.colorTheme') || '';
   if (approximateColor.toLowerCase().includes('dark')) {
-    colors = ['#2f4f4f', '#9932cc', '#4682b4', '#556b2f', '#708090', '#008b8b', '#483d8b', '#696969', '#8fbc8f', '#00ced1']; 
+    colors = ['#2f4f4f', '#9932cc', '#4682b4', '#556b2f', '#708090', '#008b8b', '#483d8b', '#696969', '#8fbc8f', '#00ced1'];
   }
   let colorIndex = 0;
 
@@ -654,7 +672,11 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
 
 
   for (let i = 0; i < flows.length; ++i) {
-    const graphView = new GraphView(context);
+
+    if (graphView === undefined) {
+      graphView = new GraphView(context);
+    }
+
     const flowName = flows[i].name;
 
     // check if graph is in memory
@@ -716,7 +738,7 @@ export function createGraph(context: vscode.ExtensionContext, flowName: string |
         graphs[flowName] = data;
         context.globalState.update("graphs", graphs);
       }
-      graphView.showGraph(data, flowName);
+      graphView?.showGraph(data, flowName);
     })
       .catch((error) => {
         vscode.window.showErrorMessage(`Graph generation failed: ${error}`);
