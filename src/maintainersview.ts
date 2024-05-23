@@ -81,12 +81,16 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 			// just pick top 5 maintainers for now, maybe add "Show all" button later
 			codeMaintainerMap = codeMaintainerMap.slice(0, 5);
 
-			that._view?.webview.postMessage({ command: 'updateMostActiveMaintainers', map: codeMaintainerMap});
+			that._view?.webview.postMessage({ command: 'updateMostActiveMaintainers', map: codeMaintainerMap });
 		}
 	}
 
 	public displayMaintainers(maintainerMapPath: string, activeFilePath: string, maintainers: LooseObject) {
 		this._view?.webview.postMessage({ command: 'updateMaintainers', maintainers: maintainers, activeFilePath: activeFilePath, maintainerMapPath: maintainerMapPath });
+	}
+
+	public displayGitMaintainers(maintainers: LooseObject) {
+		this._view?.webview.postMessage({ command: 'updateGitMaintainers', maintainers: maintainers });
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
@@ -136,6 +140,14 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 				<h1 id="maintainer-title"></h1>
 
 				<div id="maintainer-div"></div>
+
+				<h2 id="git-latest-maintainer-title">Most Recent Git Maintainer</h2>
+				
+				<div id="git-latest-maintainer-div"></div>
+
+				<h2 id="git-best-maintainer-title">Most Relevant Git Maintainer</h2>
+				
+				<div id="git-best-maintainer-div"></div>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>
 			</body>

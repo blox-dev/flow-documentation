@@ -58,3 +58,20 @@ export function addBreakpoint(message: any) {
   }
   vscode.debug.addBreakpoints(breakPoints);
 }
+
+export function findNearest(pathToCheck: string, checkFilePath: Function) {
+  let currentPath = path.resolve(pathToCheck);
+  // failsafe
+  let maxIter = 50;
+
+  while (currentPath !== path.parse(currentPath).root && maxIter > 0) {
+    if (checkFilePath(currentPath)) {
+      return currentPath;
+    }
+
+    currentPath = path.dirname(currentPath);
+    maxIter -= 1;
+  }
+
+  return null;
+}

@@ -18,6 +18,12 @@
                     updateMostActiveMaintainersTable(message.map);
                     break;
                 }
+            case 'updateGitMaintainers':
+                {
+                    console.log('updateGitMaintainers', message);
+                    updateGitMaintainers(message.maintainers);
+                    break;
+                }
         }
     });
 
@@ -34,7 +40,7 @@
             clear(node.firstChild);
         }
     }
-        
+
     function clear(node) {
         while (node.hasChildNodes()) {
             clear(node.firstChild);
@@ -48,11 +54,11 @@
 
         let mostActiveMaintainerDiv = document.querySelector('#most-active-maintainer-div');
         clearInner(mostActiveMaintainerDiv);
-        
+
         let topAccordionDiv = document.createElement("div");
         topAccordionDiv.classList.add("accordion");
 
-        for (let maintainerIndex = 0 ; maintainerIndex < maintainerMap.length ; maintainerIndex ++) {
+        for (let maintainerIndex = 0; maintainerIndex < maintainerMap.length; maintainerIndex++) {
             let maintainer = maintainerMap[maintainerIndex];
 
             let maintainerHeader = document.createElement("h2"); // <h2>William (12 maintained)</h2>
@@ -66,12 +72,12 @@
 
             let maintainsDiv = document.createElement("div");
 
-            for (let codeIndex = 0 ; codeIndex < maintainer.maintains.length ; codeIndex ++) {
+            for (let codeIndex = 0; codeIndex < maintainer.maintains.length; codeIndex++) {
                 let code = maintainer.maintains[codeIndex];
-                
+
                 let p = document.createElement("p");
                 p.innerText = "> " + code.path + ((code.regex && code.regex === true) ? " (regex)" : "");
-                
+
                 maintainsDiv.appendChild(p);
             }
 
@@ -115,6 +121,8 @@
     }
 
     function updateMaintainersTable(maintainerMapPath, filepath, maintainers) {
+
+        // reset stuff
         let infoParagraph = document.querySelector('#info_help');
         infoParagraph.textContent = "";
 
@@ -124,7 +132,20 @@
         let maintainerCodePathDiv = document.querySelector('#maintainer-div');
         clearInner(maintainerCodePathDiv);
 
+        let dummy = document.querySelector('#git-latest-maintainer-title');
+        dummy.style.display = "none";
 
+        dummy = document.querySelector('#git-latest-maintainer-div');
+        clearInner(dummy);
+
+        dummy = document.querySelector('#git-best-maintainer-title');
+        dummy.style.display = "none";
+
+        dummy = document.querySelector('#git-best-maintainer-div');
+        clearInner(dummy);
+
+
+        // doing actual things
         let title = document.querySelector('#maintainer-title');
 
         let filepathSplit = filepath.split('\\');
@@ -158,7 +179,7 @@
         let codePaths = Object.keys(maintainers);
         codePaths.sort((a, b) => b.length - a.length);
 
-        for (let codeIndex = 0; codeIndex < codePaths.length ; codeIndex ++) {
+        for (let codeIndex = 0; codeIndex < codePaths.length; codeIndex++) {
             let codePath = codePaths[codeIndex];
             let code = maintainers[codePath].code;
             let maintainerList = maintainers[codePath].maintainer;
@@ -172,14 +193,14 @@
             let maintainerDiv = document.createElement("div"); // <div>
             maintainerDiv.classList.add("accordion");
 
-            for (let i = 0 ; i < maintainerList.length ; ++i) {
+            for (let i = 0; i < maintainerList.length; ++i) {
                 const maintainer = maintainerList[i];
-                
+
                 let maintainerHeader = document.createElement("h2"); // <h2>William</h2>
                 maintainerHeader.innerHTML = maintainer.name;
-    
+
                 let maintainerContactDiv = document.createElement("div"); // <div>
-    
+
                 for (const [key, value] of Object.entries(maintainer)) {
                     if (["name", "maintains", "maintainedCount"].includes(key)) {
                         continue;
@@ -189,7 +210,7 @@
                     }
                     let p = document.createElement("p");
                     p.innerText = "\t> " + key + ": " + value;
-    
+
                     maintainerContactDiv.appendChild(p);
                 }
                 maintainerDiv.appendChild(maintainerHeader);
@@ -211,5 +232,41 @@
             active: false,
             collapsible: true
         });
+    }
+
+    function updateGitMaintainers(maintainers) {
+        if (maintainers.latest) {
+            let title = document.querySelector('#git-latest-maintainer-title');
+            title.style.display = "block";
+
+            let latestGitDiv = document.querySelector('#git-latest-maintainer-div');
+
+            for (const [key, value] of Object.entries(maintainers.latest)) {
+                if (["body"].includes(key) || vlaue === "") {
+                    continue;
+                }
+                console.log(key);
+                let p = document.createElement("p");
+                p.innerText = "\t> " + key + ": " + value;
+
+                latestGitDiv.appendChild(p);
+            }
+        }
+        if (maintainers.relevant) {
+            let title = document.querySelector('#git-best-maintainer-title');
+            title.style.display = "block";
+
+            let bestGitDiv = document.querySelector('#git-best-maintainer-div');
+
+            for (const [key, value] of Object.entries(maintainers.relevant)) {
+                if (["body"].includes(key) || value === "") {
+                    continue;
+                }
+                let p = document.createElement("p");
+                p.innerText = "\t> " + key + ": " + value;
+
+                bestGitDiv.appendChild(p);
+            }
+        }
     }
 }());

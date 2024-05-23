@@ -6,3 +6,7 @@ body {
 	border: 1px solid #59b4d4 !important;
     background:#0078a3 url("images/ui-bg_inset-soft_30_f58400_1x100.png") 50% 50% repeat-x !important;
 }
+
+#git-latest-maintainer-title, #git-best-maintainer-title {
+	display: none;
+}

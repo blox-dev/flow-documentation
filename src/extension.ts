@@ -7,8 +7,9 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { FlowsViewProvider } from "./flowsView";
 import { MaintainersViewProvider } from "./maintainersview";
-import { pathsAreEqual, escapeRegExp, escapeBackSlashRegExp } from "./utils";
+import { pathsAreEqual, escapeBackSlashRegExp, findNearest } from "./utils";
 import { GraphView } from "./graphview";
+import simpleGit, { DefaultLogFields } from 'simple-git';
 // import * as zlib from 'zlib';
 
 export interface LooseObject {
@@ -106,7 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       } else {
         fs.readFile(codeMaintainerMapPath, readFileCallback);
-        function readFileCallback(err: any, data: any) {
+        async function readFileCallback(err: any, data: any) {
           if (err) {
             if (err.code === 'ENOENT') {
               // file changed or renamed
@@ -126,6 +127,12 @@ export function activate(context: vscode.ExtensionContext) {
           }
           var activeFilePath = thisFilePath?.fsPath || "";
           const maintainers: LooseObject = findMaintainers(activeFilePath, codeMaintainerMap);
+
+          findGitMaintainers(activeFilePath).then(gitMaintainers => {
+            if (gitMaintainers !== undefined) {
+              maintainersViewProvider.displayGitMaintainers(gitMaintainers);
+            }
+          });
 
           maintainersViewProvider.displayMaintainers(codeMaintainerMapPath || "", activeFilePath, maintainers);
         }
@@ -229,6 +236,81 @@ function findMaintainers(activeFilePath: string, codeMaintainerMap: LooseObject)
   }
 
   return codeMap;
+}
+
+async function findGitMaintainers(activeFilePath: string): Promise<LooseObject | undefined> {
+
+  // const gitFolderPath = vscode.workspace.getWorkspaceFolder(thisFilePath)?.uri.fsPath;
+  const gitFolderPath = findNearestGit(activeFilePath);
+
+  if (gitFolderPath === "") {
+    // not a git folder, return
+    return;
+  }
+
+  // TODO: takes long time initially, maybe defer preload
+  const git = simpleGit(gitFolderPath);
+  try {
+    const log = await git.log({
+      file: activeFilePath,
+      n: 10,
+    });
+
+    const latestCommit = log.latest;
+
+    if (latestCommit === undefined) {
+      // no commits for last file
+      return undefined;
+    }
+
+    let mostRelevantCommit: DefaultLogFields | undefined = undefined;
+
+    // first pass, most contributions
+    let maintainerMap: LooseObject = {};
+    let max_count = 0;
+    for (let i = 0; i < log.all.length; i++) {
+      const author_name = log.all[i].author_name;
+
+      if (author_name in maintainerMap) {
+        maintainerMap[author_name] += 1;
+      } else {
+        maintainerMap[author_name] = 1;
+      }
+
+      if (maintainerMap[author_name] > max_count) {
+        max_count = maintainerMap[author_name];
+        mostRelevantCommit = log.all[i];
+      }
+    }
+
+    if (max_count > 1) {
+      // return this maintainer as most active maintainer
+      return { latest: latestCommit, relevant: mostRelevantCommit };
+    }
+
+    // second pass, biggest diff size (expensive computation)
+    max_count = 0;
+
+    for (let i = 0; i < log.all.length; i++) {
+      const commitHash = log.all[i].hash;
+      const diffSummary = await git.diffSummary([commitHash + "^!", commitHash]);
+      const { insertions, deletions } = diffSummary;
+      if (insertions + deletions > max_count) {
+        max_count = insertions + deletions;
+        mostRelevantCommit = log.all[i];
+      }
+    }
+
+    if (mostRelevantCommit) {
+      return { latest: latestCommit, relevant: mostRelevantCommit };
+    } else {
+      return { latest: latestCommit };
+    }
+  } catch (error) {
+    console.error('Error fetching git log:', error);
+    vscode.window.showErrorMessage('Failed to fetch last commit info.');
+    return undefined;
+  }
 }
 
 // This method is called when your extension is deactivated
@@ -559,26 +641,22 @@ function customFlattenObject(obj: LooseObject, parentKey: string = ''): Record<s
   return flattened;
 }
 
-function findNearestVirtualEnv(pathToCheck: string): string {
-  let currentPath = path.resolve(pathToCheck);
-  // failsafe
-  let maxIter = 50;
+function findNearestGit(pathToCheck: string): string {
+  const result = findNearest(pathToCheck, (currentPath: string) => {
+    const gitPath = path.join(currentPath, '.git');
+    return fs.existsSync(gitPath);
+  });
+  return result ? result : "";
+}
 
-  while (currentPath !== path.parse(currentPath).root && maxIter > 0) {
+function findNearestVirtualEnv(pathToCheck: string): string {
+  const result = findNearest(pathToCheck, (currentPath: string) => {
     const pythonBinPath = process.platform === 'win32'
       ? path.join(currentPath, '.venv', 'Scripts', 'python.exe')
       : path.join(currentPath, 'venv', 'bin', 'python');
-
-    if (fs.existsSync(pythonBinPath)) {
-      return pythonBinPath;
-    }
-
-    currentPath = path.dirname(currentPath);
-    maxIter -= 1;
-  }
-
-  // If no virtual environment found, set pythonBinPath to the global python interpreter
-  return process.platform === 'win32' ? 'python' : 'python3';
+    return fs.existsSync(pythonBinPath);
+  });
+  return result ? result : (process.platform === 'win32' ? 'python' : 'python3');
 }
 
 function isPythonInstalled(): boolean {
