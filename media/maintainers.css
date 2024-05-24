@@ -10,3 +10,7 @@ body {
 #git-latest-maintainer-title, #git-best-maintainer-title {
 	display: none;
 }
+
+#git-info, #git-error {
+	display: none;
+}

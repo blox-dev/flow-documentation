@@ -138,15 +138,17 @@ export class MaintainersViewProvider implements vscode.WebviewViewProvider {
 				<div id="most-active-maintainer-div"></div>
 
 				<h1 id="maintainer-title"></h1>
-
 				<div id="maintainer-div"></div>
 
+				<hr>
+
+				<p id="git-info">Loading Git Information...</p>
+				<p id="git-error"></p>
+
 				<h2 id="git-latest-maintainer-title">Most Recent Git Maintainer</h2>
-				
 				<div id="git-latest-maintainer-div"></div>
 
 				<h2 id="git-best-maintainer-title">Most Relevant Git Maintainer</h2>
-				
 				<div id="git-best-maintainer-div"></div>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>

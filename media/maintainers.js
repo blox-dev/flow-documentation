@@ -50,7 +50,7 @@
 
     function updateMostActiveMaintainersTable(maintainerMap) {
         let infoParagraph = document.querySelector('#info_help');
-        infoParagraph.textContent += "Here are the most active maintainers of this repository";
+        infoParagraph.textContent += "Here are the most active maintainers of this repository:";
 
         let mostActiveMaintainerDiv = document.querySelector('#most-active-maintainer-div');
         clearInner(mostActiveMaintainerDiv);
@@ -132,18 +132,20 @@
         let maintainerCodePathDiv = document.querySelector('#maintainer-div');
         clearInner(maintainerCodePathDiv);
 
-        let dummy = document.querySelector('#git-latest-maintainer-title');
-        dummy.style.display = "none";
+        let latestGitTitle = document.querySelector('#git-latest-maintainer-title');
+        latestGitTitle.style.display = "none";
 
-        dummy = document.querySelector('#git-latest-maintainer-div');
-        clearInner(dummy);
+        let latestGitDiv = document.querySelector('#git-latest-maintainer-div');
+        clearInner(latestGitDiv);
 
-        dummy = document.querySelector('#git-best-maintainer-title');
-        dummy.style.display = "none";
+        let bestGitTitle = document.querySelector('#git-best-maintainer-title');
+        bestGitTitle.style.display = "none";
 
-        dummy = document.querySelector('#git-best-maintainer-div');
-        clearInner(dummy);
+        let bestGitDiv = document.querySelector('#git-best-maintainer-div');
+        clearInner(bestGitDiv);
 
+        let gitInfoP = document.querySelector('#git-info');
+        gitInfoP.style.display = "block";
 
         // doing actual things
         let title = document.querySelector('#maintainer-title');
@@ -235,38 +237,89 @@
     }
 
     function updateGitMaintainers(maintainers) {
-        if (maintainers.latest) {
-            let title = document.querySelector('#git-latest-maintainer-title');
-            title.style.display = "block";
+        let latestGitDiv = document.querySelector('#git-latest-maintainer-div');
+        clearInner(latestGitDiv);
 
-            let latestGitDiv = document.querySelector('#git-latest-maintainer-div');
+        let bestGitDiv = document.querySelector('#git-best-maintainer-div');
+        clearInner(bestGitDiv);
+
+        let latestTitle = document.querySelector('#git-latest-maintainer-title');
+        let bestTitle = document.querySelector('#git-best-maintainer-title');
+
+        let gitInfoP = document.querySelector('#git-info');
+        gitInfoP.style.display = "none";
+
+        if (maintainers.error) {
+            let gitErrorP = document.querySelector('#git-error');
+            gitErrorP.innerText = maintainers.error;
+            gitErrorP.style.display = "block";
+            return;
+        }
+
+        if (maintainers.latest) {
+            latestTitle.style.display = "block";
+
+            let maintainerAccordionDiv = document.createElement("div");
+            maintainerAccordionDiv.classList.add("accordion");
+
+            let maintainerHeader = document.createElement("h2"); // <h2>William</h2>
+            maintainerHeader.innerHTML = maintainers.latest.author_name;
+
+            let maintainerContactDiv = document.createElement("div"); // <div>
 
             for (const [key, value] of Object.entries(maintainers.latest)) {
-                if (["body"].includes(key) || vlaue === "") {
+                if (["body", "author_name"].includes(key) || value === "") {
                     continue;
                 }
                 console.log(key);
                 let p = document.createElement("p");
                 p.innerText = "\t> " + key + ": " + value;
 
-                latestGitDiv.appendChild(p);
+                maintainerContactDiv.appendChild(p);
             }
+
+            maintainerAccordionDiv.appendChild(maintainerHeader);
+            maintainerAccordionDiv.appendChild(maintainerContactDiv);
+
+            latestGitDiv.appendChild(maintainerAccordionDiv);
+        } else {
+            latestTitle.style.display = "none";
         }
         if (maintainers.relevant) {
-            let title = document.querySelector('#git-best-maintainer-title');
-            title.style.display = "block";
+            bestTitle.style.display = "block";
 
-            let bestGitDiv = document.querySelector('#git-best-maintainer-div');
+            let maintainerAccordionDiv = document.createElement("div");
+            maintainerAccordionDiv.classList.add("accordion");
+
+            let maintainerHeader = document.createElement("h2"); // <h2>William</h2>
+            maintainerHeader.innerHTML = maintainers.relevant.author_name;
+
+            let maintainerContactDiv = document.createElement("div"); // <div>
 
             for (const [key, value] of Object.entries(maintainers.relevant)) {
-                if (["body"].includes(key) || value === "") {
+                if (["body", "author_name"].includes(key) || value === "") {
                     continue;
                 }
+                console.log(key);
                 let p = document.createElement("p");
                 p.innerText = "\t> " + key + ": " + value;
 
-                bestGitDiv.appendChild(p);
+                maintainerContactDiv.appendChild(p);
             }
+
+            maintainerAccordionDiv.appendChild(maintainerHeader);
+            maintainerAccordionDiv.appendChild(maintainerContactDiv);
+
+            bestGitDiv.appendChild(maintainerAccordionDiv);
+        } else {
+            bestTitle.style.display = "none";
         }
+
+        $(".accordion").accordion({
+            header: "> h2:not(.item)",
+            heightStyle: "content",
+            active: false,
+            collapsible: true
+        });
     }
 }());

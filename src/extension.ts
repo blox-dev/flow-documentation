@@ -131,6 +131,8 @@ export function activate(context: vscode.ExtensionContext) {
           findGitMaintainers(activeFilePath).then(gitMaintainers => {
             if (gitMaintainers !== undefined) {
               maintainersViewProvider.displayGitMaintainers(gitMaintainers);
+            } else {
+              maintainersViewProvider.displayGitMaintainers({ error: "Failed to Fetch Git Information"})
             }
           });
 
@@ -285,7 +287,11 @@ async function findGitMaintainers(activeFilePath: string): Promise<LooseObject |
 
     if (max_count > 1) {
       // return this maintainer as most active maintainer
-      return { latest: latestCommit, relevant: mostRelevantCommit };
+      if (latestCommit?.author_name === mostRelevantCommit?.author_name) {
+        return { relevant: mostRelevantCommit };
+      } else {
+        return { latest: latestCommit, relevant: mostRelevantCommit };
+      }
     }
 
     // second pass, biggest diff size (expensive computation)
@@ -301,10 +307,10 @@ async function findGitMaintainers(activeFilePath: string): Promise<LooseObject |
       }
     }
 
-    if (mostRelevantCommit) {
+    if (mostRelevantCommit && latestCommit && mostRelevantCommit.author_name !== latestCommit.author_name) {
       return { latest: latestCommit, relevant: mostRelevantCommit };
     } else {
-      return { latest: latestCommit };
+      return { relevant: latestCommit };
     }
   } catch (error) {
     console.error('Error fetching git log:', error);
