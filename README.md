@@ -2,6 +2,14 @@
 
 This extension will help you easily find code maintainers in your company and/or better understand the architecture of your microservice-based code.
 
+# Flow Documentation Feature
+
+![](vid/flow_documentation_demo.gif)
+
+# Maintainer Lookup Feature
+
+![](vid/maintainer_lookup_demo.gif)
+
 ## Known Issues
 
 The microservice architecture thingy is pretty fragile, so here are some improvements for future versions.
