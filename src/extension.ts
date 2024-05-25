@@ -132,7 +132,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (gitMaintainers !== undefined) {
               maintainersViewProvider.displayGitMaintainers(gitMaintainers);
             } else {
-              maintainersViewProvider.displayGitMaintainers({ error: "Failed to Fetch Git Information"})
+              maintainersViewProvider.displayGitMaintainers({ error: "Failed to Fetch Git Information" });
             }
           });
 
