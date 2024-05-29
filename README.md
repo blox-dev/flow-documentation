@@ -4,11 +4,11 @@ This extension will help you easily find code maintainers in your company and/or
 
 # Flow Documentation Feature
 
-![](vid/flow_documentation_demo.gif)
+<img src="vid/flow_documentation_demo.gif" />
 
 # Maintainer Lookup Feature
 
-![](vid/maintainer_lookup_demo.gif)
+<img src="vid/maintainer_lookup_demo.gif" />
 
 ## Known Issues
 
