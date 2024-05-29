@@ -7,7 +7,7 @@
   "name": "flow-documentation",
   "displayName": "flow-documentation",
   "description": "",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.83.0"
   },
