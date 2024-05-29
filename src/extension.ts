@@ -662,7 +662,12 @@ function findNearestVirtualEnv(pathToCheck: string): string {
       : path.join(currentPath, 'venv', 'bin', 'python');
     return fs.existsSync(pythonBinPath);
   });
-  return result ? result : (process.platform === 'win32' ? 'python' : 'python3');
+  if (result) {
+    return process.platform === 'win32'
+    ? path.join(result, '.venv', 'Scripts', 'python.exe')
+    : path.join(result, 'venv', 'bin', 'python');
+  }
+  return process.platform === 'win32' ? 'python' : 'python3';
 }
 
 function isPythonInstalled(): boolean {
@@ -683,13 +688,7 @@ function runPythonProg(extensionUri: vscode.Uri, flow: LooseObject, endPoints: L
       ? vscode.workspace.workspaceFolders[0].uri.fsPath
       : "";
 
-    let pythonPath = "";
-
-    if (workspacePath === "") {
-      pythonPath = process.platform === 'win32' ? 'python' : 'python3';
-    } else {
-      pythonPath = findNearestVirtualEnv(workspacePath);
-    }
+    const pythonPath = findNearestVirtualEnv(workspacePath);
 
     const pythonScriptPath = vscode.Uri.joinPath(extensionUri, "src", "walk_from_func.py");
     const endP = JSON.stringify(endPoints);
