@@ -516,35 +516,6 @@ export function extractRFF(context: vscode.ExtensionContext) {
   context.globalState.update("flows", flows);
   context.globalState.update("funcs", funcs);
 
-  fs.readFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, function (err, data) {
-    if (err) {
-      console.log(err);
-      return;
-    }
-    let endP: LooseObject = {};
-
-    try {
-      endP = JSON.parse(data.toString());
-    } catch {
-      console.log("Invalid json config");
-    }
-    for (let i = 0; i < routes.length; ++i) {
-      const route = routes[i];
-
-      // TODO: unique id for each route
-      const routeId = route.func_name;
-
-      endP[routeId] = {
-        "route_expr": route.name,
-        "module": route.module,
-        "func_name": route.func_name,
-        "route_file": route.file,
-      };
-    }
-    const routeStr = JSON.stringify(endP, null, 4);
-    fs.writeFile(vscode.Uri.joinPath(context.extensionUri, "src", "endPointMap.json").fsPath, routeStr, 'utf8', function () { });
-  });
-
   let tmp = new Set();
   flows.forEach((f) => {
     if (tmp.has(f.name)) {
