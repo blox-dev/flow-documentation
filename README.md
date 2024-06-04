@@ -2,6 +2,8 @@
 
 This extension will help you easily find code maintainers in your company and/or better understand the architecture of your microservice-based code.
 
+Now available in the VSCode Marketplace: just search for the `flow-documentation` extension.
+
 # Flow Documentation Feature
 
 <img src="vid/flow_documentation_demo.gif" />
