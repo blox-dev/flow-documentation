@@ -6,11 +6,11 @@ Now available in the VSCode Marketplace: just search for the `flow-documentation
 
 # Flow Documentation Feature
 
-<img src="vid/flow_documentation_demo.gif" />
+<img src="./vid/flow_documentation_demo.gif" />
 
 # Maintainer Lookup Feature
 
-<img src="vid/maintainer_lookup_demo.gif" />
+<img src="./vid/maintainer_lookup_demo.gif" />
 
 ## Known Issues
 
